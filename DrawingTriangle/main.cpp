@@ -7,6 +7,11 @@
 #include <vector>
 #include <cstring>
 
+#ifndef WIN32
+#define __stdcall
+#endif
+
+
 VkResult CreateDebugReportCallbackEXT(
 	VkInstance instance,
 	const VkDebugReportCallbackCreateInfoEXT* pCreateInfo,
@@ -122,7 +127,7 @@ class HelloTriangleApplication {
 		VkDebugReportCallbackCreateInfoEXT createInfo = {};
 		createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
 		createInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
-		createInfo.pfnCallback = (PFN_vkDebugReportCallbackEXT)(this->_debugCallback);
+		createInfo.pfnCallback = (PFN_vkDebugReportCallbackEXT)(_debugCallback);
 
 		if (
 			CreateDebugReportCallbackEXT(
@@ -134,6 +139,21 @@ class HelloTriangleApplication {
 		) {
 			throw std::runtime_error("failed to set up debug callback!");
 		}
+	}
+
+	static VkBool32 __stdcall _debugCallback(
+		VkDebugReportFlagsEXT flags,
+		VkDebugReportObjectTypeEXT objType,
+		uint64_t obj,
+		size_t location,
+		int32_t code,
+		const char* layerPrefix,
+		const char* msg,
+		void* userData
+	) {
+		std::cerr << "validation layer: " << msg << std::endl;
+
+		return VK_FALSE;
 	}
 
 	void _mainLoop() {
@@ -164,12 +184,6 @@ class HelloTriangleApplication {
 		createInfo.ppEnabledExtensionNames = glfwExtensions;
 		createInfo.enabledLayerCount = 0;
 
-		VkResult result = vkCreateInstance(&createInfo, nullptr, &(this->_instance));
-
-		if (result != VK_SUCCESS) {
-			throw std::runtime_error("failed to create instance!");
-		}
-
 		if (enableValidationLayers && !this->_checkValidationLayerSupport()) {
 			throw std::runtime_error("validation layers requested, but not available!");
 		}
@@ -178,17 +192,23 @@ class HelloTriangleApplication {
 			throw std::runtime_error("glfw extensions are not supported!");
 		}
 
+		this->_validExtensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
+
 		if (enableValidationLayers) {
 			createInfo.enabledLayerCount = requiredLayers.size();
 			createInfo.ppEnabledLayerNames = requiredLayers.data();
-
-			this->_validExtensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 		} else {
 			createInfo.enabledLayerCount = 0;
 		}
 
 		createInfo.enabledExtensionCount = this->_validExtensions.size();
 		createInfo.ppEnabledExtensionNames = this->_validExtensions.data();
+
+		VkResult result = vkCreateInstance(&createInfo, nullptr, &(this->_instance));
+
+		if (result != VK_SUCCESS) {
+			throw std::runtime_error("failed to create instance!");
+		}
 	}
 
 	bool _checkValidationLayerSupport() {
@@ -231,7 +251,7 @@ class HelloTriangleApplication {
 
 		std::cout << "Requred extensions:" << std::endl;
 
-		for (int i = 0; i < glfwExtensionCount; i++) {
+		for (unsigned int i = 0; i < glfwExtensionCount; i++) {
 			bool extensionFound = false;
 
 			std::cout << glfwExtensions[i] << std::endl;
@@ -252,21 +272,6 @@ class HelloTriangleApplication {
 		}
 
 		return true;
-	}
-
-	static VkBool32 _debugCallback(
-		VkDebugReportFlagsEXT flags,
-		VkDebugReportObjectTypeEXT objType,
-		uint64_t obj,
-		size_t location,
-		int32_t code,
-		const char* layerPrefix,
-		const char* msg,
-		void* userData
-	) {
-		std::cerr << "validation layer: " << msg << std::endl;
-
-		return VK_FALSE;
 	}
 
 public:
