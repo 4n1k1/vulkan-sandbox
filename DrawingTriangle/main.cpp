@@ -102,9 +102,14 @@ const bool enableValidationLayers = true;
 
 struct QueueFamilyIndices {
 	int graphicsFamily = -1;
+	int presentFamily = -1;
 
 	bool isComplete() {
-		return graphicsFamily >= 0;
+		return graphicsFamily >= 0 && presentFamily >= 0;
+	}
+
+	bool useSameFamily() {
+		return graphicsFamily == presentFamily;
 	}
 };
 
@@ -113,11 +118,13 @@ class HelloTriangleApplication {
 	GLFWwindow* _window;
 	VDeleter<VkInstance> _instance{ vkDestroyInstance };
 	VDeleter<VkDebugReportCallbackEXT> _callback{ _instance, DestroyDebugReportCallbackEXT };
+	VDeleter<VkSurfaceKHR> _surface{ _instance, vkDestroySurfaceKHR };
 	std::vector<const char*> _validExtensions;
 	VkPhysicalDevice _physicalDevice = VK_NULL_HANDLE;
 	VDeleter<VkDevice> _device{ vkDestroyDevice };
 	QueueFamilyIndices _queueFamilyIndices;
 	VkQueue _graphicsQueue;
+	VkQueue _presentQueue;
 
 	void _initWindow() {
 		glfwInit();
@@ -131,8 +138,22 @@ class HelloTriangleApplication {
 	void _initVulkan() {
 		this->_createInstance();
 		this->_setupDebugCallback();
+		this->_createSurface();
 		this->_pickPhysicalDevice();
 		this->_createLogicalDevice();
+	}
+
+	void _createSurface() {
+		if (
+			glfwCreateWindowSurface(
+				this->_instance,
+				this->_window,
+				nullptr,
+				&(this->_surface)
+			) != VK_SUCCESS
+		) {
+			throw std::runtime_error("failed to create window surface!");
+		}
 	}
 
 	void _createLogicalDevice() {
@@ -180,6 +201,13 @@ class HelloTriangleApplication {
 			0,
 			&(this->_graphicsQueue)
 		);
+
+		vkGetDeviceQueue(
+			this->_device,
+			this->_queueFamilyIndices.presentFamily,
+			0,
+			&(this->_presentQueue)
+		);
 	}
 
 	void _setQueueFamilyIndicies(VkPhysicalDevice device) {
@@ -190,9 +218,17 @@ class HelloTriangleApplication {
 		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
 
 		int i = 0;
+
 		for (const auto& queueFamily : queueFamilies) {
 			if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
 				this->_queueFamilyIndices.graphicsFamily = i;
+			}
+
+			VkBool32 presentSupport = false;
+			vkGetPhysicalDeviceSurfaceSupportKHR(device, i, this->_surface, &presentSupport);
+
+			if (queueFamily.queueCount > 0 && presentSupport) {
+				this->_queueFamilyIndices.presentFamily = i;
 			}
 
 			if (this->_queueFamilyIndices.isComplete()) {
@@ -221,12 +257,16 @@ class HelloTriangleApplication {
 
 				if (
 					deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
-					this->_queueFamilyIndices.isComplete()
+					this->_queueFamilyIndices.isComplete() && this->_queueFamilyIndices.useSameFamily()
 				) {
 					this->_physicalDevice = device;
 
 					break;
 				}
+			}
+
+			if (this->_physicalDevice == nullptr) {
+				throw std::runtime_error("no GPU with same queue family for graphics and present queues!");
 			}
 		}
 	};
