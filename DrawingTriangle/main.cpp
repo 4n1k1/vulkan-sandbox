@@ -100,12 +100,24 @@ const bool enableValidationLayers = false;
 const bool enableValidationLayers = true;
 #endif
 
+struct QueueFamilyIndices {
+	int graphicsFamily = -1;
+
+	bool isComplete() {
+		return graphicsFamily >= 0;
+	}
+};
+
 class HelloTriangleApplication {
 
 	GLFWwindow* _window;
 	VDeleter<VkInstance> _instance{ vkDestroyInstance };
 	VDeleter<VkDebugReportCallbackEXT> _callback{ _instance, DestroyDebugReportCallbackEXT };
 	std::vector<const char*> _validExtensions;
+	VkPhysicalDevice _physicalDevice = VK_NULL_HANDLE;
+	VDeleter<VkDevice> _device{ vkDestroyDevice };
+	QueueFamilyIndices _queueFamilyIndices;
+	VkQueue _graphicsQueue;
 
 	void _initWindow() {
 		glfwInit();
@@ -119,7 +131,105 @@ class HelloTriangleApplication {
 	void _initVulkan() {
 		this->_createInstance();
 		this->_setupDebugCallback();
+		this->_pickPhysicalDevice();
+		this->_createLogicalDevice();
 	}
+
+	void _createLogicalDevice() {
+		VkDeviceQueueCreateInfo queueCreateInfo = {};
+		queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfo.queueFamilyIndex = this->_queueFamilyIndices.graphicsFamily;
+		queueCreateInfo.queueCount = 1;
+		float queuePriority = 1.0f;
+		queueCreateInfo.pQueuePriorities = &queuePriority;
+
+		VkPhysicalDeviceFeatures deviceFeatures = {};
+
+		VkDeviceCreateInfo createInfo = {};
+		createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+
+		createInfo.pQueueCreateInfos = &queueCreateInfo;
+		createInfo.queueCreateInfoCount = 1;
+
+		createInfo.pEnabledFeatures = &deviceFeatures;
+
+		createInfo.enabledExtensionCount = 0;
+
+		if (enableValidationLayers) {
+			createInfo.enabledLayerCount = requiredLayers.size();
+			createInfo.ppEnabledLayerNames = requiredLayers.data();
+		}
+		else {
+			createInfo.enabledLayerCount = 0;
+		}
+
+		if (
+			vkCreateDevice(
+				this->_physicalDevice,
+				&createInfo,
+				nullptr,
+				&(this->_device)
+			) != VK_SUCCESS
+		) {
+			throw std::runtime_error("failed to create logical device!");
+		}
+
+		vkGetDeviceQueue(
+			this->_device,
+			this->_queueFamilyIndices.graphicsFamily,
+			0,
+			&(this->_graphicsQueue)
+		);
+	}
+
+	void _setQueueFamilyIndicies(VkPhysicalDevice device) {
+		uint32_t queueFamilyCount = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+		std::vector<VkQueueFamilyProperties> queueFamilies(queueFamilyCount);
+		vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies.data());
+
+		int i = 0;
+		for (const auto& queueFamily : queueFamilies) {
+			if (queueFamily.queueCount > 0 && queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+				this->_queueFamilyIndices.graphicsFamily = i;
+			}
+
+			if (this->_queueFamilyIndices.isComplete()) {
+				break;
+			}
+
+			i++;
+		}
+	}
+
+	void _pickPhysicalDevice() {
+		uint32_t deviceCount = 0;
+		vkEnumeratePhysicalDevices(this->_instance, &deviceCount, nullptr);
+
+		std::vector<VkPhysicalDevice> devices(deviceCount);
+		vkEnumeratePhysicalDevices(this->_instance, &deviceCount, devices.data());
+
+		if (deviceCount == 0) {
+			throw std::runtime_error("failed to find GPUs with Vulkan support!");
+		} else {
+			for (const auto& device : devices) {
+				VkPhysicalDeviceProperties deviceProperties;
+				vkGetPhysicalDeviceProperties(device, &deviceProperties);
+
+				this->_setQueueFamilyIndicies(device);
+
+				if (
+					deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
+					this->_queueFamilyIndices.isComplete()
+				) {
+					this->_physicalDevice = device;
+
+					break;
+				}
+			}
+		}
+	};
 
 	void _setupDebugCallback() {
 		if (!enableValidationLayers) return;
@@ -175,18 +285,14 @@ class HelloTriangleApplication {
 		createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 		createInfo.pApplicationInfo = &appInfo;
 
+		if (enableValidationLayers && !this->_checkValidationLayerSupport()) {
+			throw std::runtime_error("validation layers requested, but not available!");
+		}
+
 		unsigned int glfwExtensionCount = 0;
 		const char** glfwExtensions;
 
 		glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-		createInfo.enabledExtensionCount = glfwExtensionCount;
-		createInfo.ppEnabledExtensionNames = glfwExtensions;
-		createInfo.enabledLayerCount = 0;
-
-		if (enableValidationLayers && !this->_checkValidationLayerSupport()) {
-			throw std::runtime_error("validation layers requested, but not available!");
-		}
 
 		if (!this->_checkExtensionSupport(glfwExtensionCount, glfwExtensions)) {
 			throw std::runtime_error("glfw extensions are not supported!");
