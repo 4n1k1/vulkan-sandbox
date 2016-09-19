@@ -33,6 +33,11 @@ public:
 		this->_cleanup();
 	}
 
+	T* replace() {
+		this->_cleanup();
+		return &(this->_object);
+	}
+
 	T* operator &() {
 		this->_cleanup();
 		return &(this->_object);

@@ -7,4 +7,17 @@
   <ItemGroup>
     <ClInclude Include="HelloTriangleApplication.hpp" />
   </ItemGroup>
+  <ItemGroup>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{a3f1c62f-952b-460b-86dc-584abe3f670d}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\shader.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="shaders\shader.vert">
+      <Filter>shaders</Filter>
+    </None>
+  </ItemGroup>
 </Project>
