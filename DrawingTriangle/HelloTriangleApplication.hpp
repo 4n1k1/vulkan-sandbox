@@ -115,9 +115,12 @@ class HelloTriangleApplication {
 		glfwInit();
 
 		glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); // don't create OpenGL context
-		glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE); // disable resizing
+		glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE); // enable resizing
 
-		this->_window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
+		this->_window = glfwCreateWindow(WIDTH, HEIGHT, "zGame", nullptr, nullptr);
+
+		glfwSetWindowUserPointer(this->_window, this);
+		glfwSetWindowSizeCallback(this->_window, HelloTriangleApplication::_onWindowResized);
 	}
 
 	void _initVulkan() {
@@ -136,6 +139,19 @@ class HelloTriangleApplication {
 		this->_createSemaphores();
 	}
 
+	void _recreateSwapChain() {
+		vkDeviceWaitIdle(this->_device);
+
+		this->_createSwapChain();
+		this->_createImageViews();
+		this->_createRenderPass();
+		this->_createGraphicsPipeline();
+		this->_createFramebuffers();
+		this->_createCommandBuffers();
+
+		this->_drawFrame();
+	}
+
 	void _createSemaphores() {
 		VkSemaphoreCreateInfo semaphoreInfo = {};
 		semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -149,6 +165,15 @@ class HelloTriangleApplication {
 	}
 
 	void _createCommandBuffers() {
+		if (this->_commandBuffers.size() > 0) {
+			vkFreeCommandBuffers(
+				this->_device,
+				this->_commandPool,
+				(uint32_t)this->_commandBuffers.size(),
+				this->_commandBuffers.data()
+			);
+		}
+
 		this->_commandBuffers.resize(
 			this->_swapChainFramebuffers.size()
 		);
@@ -364,7 +389,7 @@ class HelloTriangleApplication {
 		multisampling.sampleShadingEnable = VK_FALSE;
 		multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 		multisampling.minSampleShading = 1.0f; // Optional
-		multisampling.pSampleMask = nullptr; /// Optional
+		multisampling.pSampleMask = nullptr; // Optional
 		multisampling.alphaToCoverageEnable = VK_FALSE; // Optional
 		multisampling.alphaToOneEnable = VK_FALSE; // Optional
 
@@ -524,8 +549,7 @@ class HelloTriangleApplication {
 		if (enableValidationLayers) {
 			createInfo.enabledLayerCount = (uint32_t)requiredLayers.size();
 			createInfo.ppEnabledLayerNames = requiredLayers.data();
-		}
-		else {
+		} else {
 			createInfo.enabledLayerCount = 0;
 		}
 
@@ -539,7 +563,7 @@ class HelloTriangleApplication {
 				nullptr,
 				&(this->_device)
 			) != VK_SUCCESS
-			) {
+		) {
 			throw std::runtime_error("failed to create logical device!");
 		}
 
@@ -596,8 +620,7 @@ class HelloTriangleApplication {
 
 		if (deviceCount == 0) {
 			throw std::runtime_error("failed to find GPUs with Vulkan support!");
-		}
-		else {
+		} else {
 			for (const auto& device : devices) {
 				if (this->_isPhysicalDeviceSuitable(device)) {
 					this->_physicalDevice = device;
@@ -663,7 +686,7 @@ class HelloTriangleApplication {
 				nullptr,
 				&(this->_callback)
 			) != VK_SUCCESS
-			) {
+		) {
 			throw std::runtime_error("failed to set up debug callback!");
 		}
 	}
@@ -720,15 +743,19 @@ class HelloTriangleApplication {
 		presentInfo.pImageIndices = &imageIndex;
 		presentInfo.pResults = nullptr; // Optional
 
-		vkQueuePresentKHR(this->_presentQueue, &presentInfo);
+		VkResult result = vkQueuePresentKHR(this->_presentQueue, &presentInfo);
+
+		if (result != VK_SUCCESS) {
+			throw std::runtime_error("failed to present swap chain image!");
+		}
 	}
 
 	void _createInstance() {
 		VkApplicationInfo appInfo = {};
 		appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-		appInfo.pApplicationName = "Hello Triangle";
+		appInfo.pApplicationName = "zGame";
 		appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-		appInfo.pEngineName = "No Engine";
+		appInfo.pEngineName = "zEngine";
 		appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
 		appInfo.apiVersion = VK_API_VERSION_1_0;
 
@@ -801,18 +828,23 @@ class HelloTriangleApplication {
 		std::vector<VkExtensionProperties> supportedExtensions(extensionCount);
 		vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, supportedExtensions.data());
 
+#ifndef NDEBUG
 		std::cout << "Supported extensions:" << std::endl;
+#endif
 
 		for (const auto& extension : supportedExtensions) {
 			std::cout << extension.extensionName << std::endl;
 		}
 
+#ifndef NDEBUG
 		std::cout << "Requred extensions:" << std::endl;
-
+#endif
 		for (unsigned int i = 0; i < glfwExtensionCount; i++) {
 			bool extensionFound = false;
 
+#ifndef NDEBUG
 			std::cout << glfwExtensions[i] << std::endl;
+#endif
 
 			for (const auto& extension : supportedExtensions) {
 				if (strcmp(glfwExtensions[i], extension.extensionName) == 0) {
@@ -962,6 +994,13 @@ class HelloTriangleApplication {
 		file.close();
 
 		return buffer;
+	}
+
+	static void _onWindowResized(GLFWwindow* window, int width, int height) {
+		if (width == 0 || height == 0) return;
+
+		HelloTriangleApplication* app = reinterpret_cast<HelloTriangleApplication*>(glfwGetWindowUserPointer(window));
+		app->_recreateSwapChain();
 	}
 
 public:

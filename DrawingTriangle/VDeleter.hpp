@@ -1,6 +1,10 @@
 #include <vulkan/vulkan.h>
 #include <functional>
 
+#ifndef NDEBUG
+#include <iostream>
+#endif
+
 template <typename T>
 class VDeleter {
 
@@ -15,22 +19,30 @@ class VDeleter {
 	}
 
 public:
-	VDeleter() : VDeleter([](T _) {}) {}
+	VDeleter() {
+#ifndef NDEBUG
+		std::cout << "Object of class: " << typeid(T).name() << " created." << std::endl;
+#endif
+	}
 
-	VDeleter(std::function<void(T, VkAllocationCallbacks*)> deletef) {
+	VDeleter(std::function<void(T, VkAllocationCallbacks*)> deletef): VDeleter() {
 		this->_deleter = [=](T obj) { deletef(obj, nullptr); };
 	}
 
-	VDeleter(const VDeleter<VkInstance>& instance, std::function<void(VkInstance, T, VkAllocationCallbacks*)> deletef) {
+	VDeleter(const VDeleter<VkInstance>& instance, std::function<void(VkInstance, T, VkAllocationCallbacks*)> deletef): VDeleter() {
 		this->_deleter = [&instance, deletef](T obj) { deletef(instance, obj, nullptr); };
 	}
 
-	VDeleter(const VDeleter<VkDevice>& device, std::function<void(VkDevice, T, VkAllocationCallbacks*)> deletef) {
+	VDeleter(const VDeleter<VkDevice>& device, std::function<void(VkDevice, T, VkAllocationCallbacks*)> deletef): VDeleter() {
 		this->_deleter = [&device, deletef](T obj) { deletef(device, obj, nullptr); };
 	}
 
 	~VDeleter() {
 		this->_cleanup();
+
+#ifndef NDEBUG
+		std::cout << "Object of class: " << typeid(T).name() << " destroyed." << std::endl;
+#endif
 	}
 
 	T* replace() {
