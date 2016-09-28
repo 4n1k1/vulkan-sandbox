@@ -6,6 +6,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="HelloTriangleApplication.hpp" />
+    <ClInclude Include="zGame.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="shaders">

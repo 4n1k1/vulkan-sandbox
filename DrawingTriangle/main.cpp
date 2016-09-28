@@ -1,6 +1,14 @@
 #include "HelloTriangleApplication.hpp"
 
+#include "Logger.hpp"
+
+Logger *logger;
+
 int main() try {
+	logger = new Logger();
+
+	logger->SetLogFileName("zGame.log");
+
 	HelloTriangleApplication app;
 
 	app.run();
@@ -8,6 +16,7 @@ int main() try {
 	return EXIT_SUCCESS;
 }
 catch (const std::runtime_error& e) {
-	std::cerr << e.what() << std::endl;
+	LOG_DEBUG(e.what());
+
 	return EXIT_FAILURE;
 }

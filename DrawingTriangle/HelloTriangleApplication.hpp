@@ -8,7 +8,9 @@
 #include <cstring>
 #include <set>
 #include <algorithm>
+#include <sstream>
 
+#include "zGame.hpp"
 #include "VDeleter.hpp"
 
 #ifndef WIN32
@@ -772,10 +774,11 @@ class HelloTriangleApplication {
 
 		glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
-		if (!this->_checkExtensionSupport(glfwExtensionCount, glfwExtensions)) {
+		if (!this->_checkGLFWExtensionsSupport(glfwExtensionCount, glfwExtensions)) {
 			throw std::runtime_error("glfw extensions are not supported!");
 		}
 
+		// assuming VK_EXT_DEBUG_REPORT_EXTENSION_NAME extension is supported
 		this->_validExtensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 
 		if (enableValidationLayers) {
@@ -821,30 +824,40 @@ class HelloTriangleApplication {
 		return true;
 	}
 
-	bool _checkExtensionSupport(unsigned int glfwExtensionCount, const char** glfwExtensions) {
+	bool _checkGLFWExtensionsSupport(unsigned int glfwExtensionCount, const char** glfwExtensions) {
 		uint32_t extensionCount = 0;
 		vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
 
 		std::vector<VkExtensionProperties> supportedExtensions(extensionCount);
 		vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, supportedExtensions.data());
 
-#ifndef NDEBUG
-		std::cout << "Supported extensions:" << std::endl;
-#endif
+		std::ostringstream log_record;
+
+		log_record << "Supported extensions: ";
 
 		for (const auto& extension : supportedExtensions) {
-			std::cout << extension.extensionName << std::endl;
+			log_record << extension.extensionName;
+
+			if (strcmp(extension.extensionName, supportedExtensions.back().extensionName) != 0) {
+				log_record << ", ";
+			}
 		}
 
-#ifndef NDEBUG
-		std::cout << "Requred extensions:" << std::endl;
-#endif
+		LOG_DEBUG(log_record.str());
+
+		log_record.str("");
+		log_record.clear();
+
+		log_record << "GLFW required extensions: ";
+
 		for (unsigned int i = 0; i < glfwExtensionCount; i++) {
 			bool extensionFound = false;
 
-#ifndef NDEBUG
-			std::cout << glfwExtensions[i] << std::endl;
-#endif
+			log_record << glfwExtensions[i];
+
+			if (i != glfwExtensionCount - 1) {
+				log_record << ", ";
+			}
 
 			for (const auto& extension : supportedExtensions) {
 				if (strcmp(glfwExtensions[i], extension.extensionName) == 0) {
@@ -860,6 +873,8 @@ class HelloTriangleApplication {
 				return false;
 			}
 		}
+
+		LOG_DEBUG(log_record.str());
 
 		return true;
 	}
@@ -974,7 +989,7 @@ class HelloTriangleApplication {
 		const char* msg,
 		void* userData
 	) {
-		std::cerr << "validation layer: " << msg << std::endl;
+		LOG_DEBUG("validation layer: " + string(msg));
 
 		return VK_FALSE;
 	}

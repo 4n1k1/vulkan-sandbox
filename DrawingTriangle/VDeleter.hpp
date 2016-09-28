@@ -1,9 +1,8 @@
 #include <vulkan/vulkan.h>
 #include <functional>
+#include <string>
 
-#ifndef NDEBUG
-#include <iostream>
-#endif
+#include "zGame.hpp"
 
 template <typename T>
 class VDeleter {
@@ -19,10 +18,9 @@ class VDeleter {
 	}
 
 public:
+
 	VDeleter() {
-#ifndef NDEBUG
-		std::cout << "Object of class: " << typeid(T).name() << " created." << std::endl;
-#endif
+		LOG_DEBUG("Object of class: " + std::string(typeid(T).name()) + " created.");
 	}
 
 	VDeleter(std::function<void(T, VkAllocationCallbacks*)> deletef): VDeleter() {
@@ -40,9 +38,7 @@ public:
 	~VDeleter() {
 		this->_cleanup();
 
-#ifndef NDEBUG
-		std::cout << "Object of class: " << typeid(T).name() << " destroyed." << std::endl;
-#endif
+		LOG_DEBUG("Object of class: " + std::string(typeid(T).name()) + " destroyed.");
 	}
 
 	T* replace() {
