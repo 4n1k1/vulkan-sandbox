@@ -171,6 +171,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="HelloTriangleApplication.hpp" />
+    <ClInclude Include="VertexInput.hpp" />
     <ClInclude Include="zGame.hpp" />
   </ItemGroup>
   <ItemGroup>

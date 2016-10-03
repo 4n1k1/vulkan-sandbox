@@ -7,6 +7,7 @@
   <ItemGroup>
     <ClInclude Include="HelloTriangleApplication.hpp" />
     <ClInclude Include="zGame.hpp" />
+    <ClInclude Include="VertexInput.hpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="shaders">

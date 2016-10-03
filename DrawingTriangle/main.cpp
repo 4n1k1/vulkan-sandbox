@@ -9,6 +9,8 @@ int main() try {
 
 	logger->SetLogFileName("zGame.log");
 
+	LOG_DEBUG("========================================");
+
 	HelloTriangleApplication app;
 
 	app.run();
