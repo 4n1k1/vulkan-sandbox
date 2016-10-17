@@ -1,0 +1,47 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="..\..\src\implementation\windows\main.cpp">
+      <Filter>implementation</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\implementation\windows\Vertex.cpp">
+      <Filter>implementation</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\src\interface\HelloTriangleApplication.hpp">
+      <Filter>interface</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\interface\Vertex.hpp">
+      <Filter>interface</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\interface\zGame.hpp">
+      <Filter>interface</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\templates\VDeleter.hpp">
+      <Filter>templates</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{a3f1c62f-952b-460b-86dc-584abe3f670d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="interface">
+      <UniqueIdentifier>{79fbde2c-0881-4563-993a-1c461e5a5643}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="implementation">
+      <UniqueIdentifier>{54d1b40d-b99d-48d2-abab-dfd943c5fee3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="templates">
+      <UniqueIdentifier>{6c0fea79-6b2d-4e7f-ada2-f904f9ef9cbd}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\src\shaders\shader.frag">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\src\shaders\shader.vert">
+      <Filter>shaders</Filter>
+    </None>
+  </ItemGroup>
+</Project>

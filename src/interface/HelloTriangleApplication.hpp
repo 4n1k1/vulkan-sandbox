@@ -9,10 +9,15 @@
 #include <set>
 #include <algorithm>
 #include <sstream>
+#include <chrono>
+
+#define GLM_FORCE_RADIANS
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 #include "zGame.hpp"
 #include "VDeleter.hpp"
-#include "VertexInput.hpp"
+#include "Vertex.hpp"
 
 #ifndef WIN32
 #define __stdcall
@@ -55,12 +60,28 @@ void DestroyDebugReportCallbackEXT(
 const int WIDTH = 800;
 const int HEIGHT = 600;
 
+const std::vector<Vertex> vertices = {
+	{ { -0.5f, -0.5f },{ 1.0f, 0.0f, 0.0f } },
+	{ { 0.5f, -0.5f },{ 0.0f, 1.0f, 0.0f } },
+	{ { 0.5f, 0.5f },{ 0.0f, 0.0f, 1.0f } },
+	{ { -0.5f, 0.5f },{ 1.0f, 1.0f, 1.0f } }
+};
+
+const std::vector<uint16_t> indices = {
+	0, 1, 2, 2, 3, 0
+};
+
 const std::vector<const char*> requiredLayers = {
 	"VK_LAYER_LUNARG_standard_validation"
 };
-
 const std::vector<const char*> requiredDeviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
+};
+
+struct UniformBufferObject {
+	glm::mat4 model;
+	glm::mat4 view;
+	glm::mat4 proj;
 };
 
 #ifdef NDEBUG
@@ -81,7 +102,6 @@ struct QueueFamilyIndices {
 		return graphicsFamily == presentFamily;
 	}
 };
-
 struct SwapChainSupportDetails {
 	VkSurfaceCapabilitiesKHR capabilities;
 	std::vector<VkSurfaceFormatKHR> formats;
@@ -115,8 +135,13 @@ class HelloTriangleApplication {
 	VDeleter<VkSemaphore> _renderFinishedSemaphore{ this->_device, vkDestroySemaphore };
 	VDeleter<VkBuffer> _vertexBuffer{ this->_device, vkDestroyBuffer };
 	VDeleter<VkDeviceMemory> _vertexBufferMemory{ this->_device, vkFreeMemory };
-	VDeleter<VkBuffer> indexBuffer{ this->_device, vkDestroyBuffer };
-	VDeleter<VkDeviceMemory> indexBufferMemory{ this->_device, vkFreeMemory };
+	VDeleter<VkBuffer> _indexBuffer{ this->_device, vkDestroyBuffer };
+	VDeleter<VkDeviceMemory> _indexBufferMemory{ this->_device, vkFreeMemory };
+	VDeleter<VkBuffer> _uniformStagingBuffer{ this->_device, vkDestroyBuffer };
+	VDeleter<VkDeviceMemory> _uniformStagingBufferMemory{ this->_device, vkFreeMemory };
+	VDeleter<VkBuffer> _uniformBuffer{ this->_device, vkDestroyBuffer };
+	VDeleter<VkDeviceMemory> _uniformBufferMemory{ this->_device, vkFreeMemory };
+	VDeleter<VkDescriptorSetLayout> _descriptorSetLayout{ this->_device, vkDestroyDescriptorSetLayout };
 
 	void _initWindow() {
 		glfwInit();
@@ -139,13 +164,80 @@ class HelloTriangleApplication {
 		this->_createSwapChain();
 		this->_createImageViews();
 		this->_createRenderPass();
+		this->_createDescriptorSetLayout();
 		this->_createGraphicsPipeline();
 		this->_createFramebuffers();
 		this->_createCommandPool();
 		this->_createVertexBuffer();
 		this->_createIndexBuffer();
+		this->_createUniformBuffer();
 		this->_createCommandBuffers();
 		this->_createSemaphores();
+	}
+
+	void _createUniformBuffer() {
+		VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+
+		this->_createBuffer(
+			bufferSize,
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			this->_uniformStagingBuffer,
+			this->_uniformStagingBufferMemory
+		);
+		this->_createBuffer(
+			bufferSize,
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			this->_uniformBuffer,
+			this->_uniformBufferMemory
+		);
+	}
+
+	void _updateUniformBuffer() {
+		static auto startTime = std::chrono::high_resolution_clock::now();
+
+		auto currentTime = std::chrono::high_resolution_clock::now();
+		float time = std::chrono::duration_cast<std::chrono::milliseconds>(currentTime - startTime).count() / 1000.0f;
+
+		UniformBufferObject ubo = {};
+
+		ubo.model = glm::rotate(glm::mat4(), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+		ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+		ubo.proj = glm::perspective(glm::radians(45.0f), this->_swapChainExtent.width / (float)this->_swapChainExtent.height, 0.1f, 10.0f);
+
+		ubo.proj[1][1] *= -1;
+
+		void* data;
+		vkMapMemory(this->_device, this->_uniformStagingBufferMemory, 0, sizeof(ubo), 0, &data);
+		memcpy(data, &ubo, sizeof(ubo));
+		vkUnmapMemory(this->_device, this->_uniformStagingBufferMemory);
+
+		this->_copyBuffer(this->_uniformStagingBuffer, this->_uniformBuffer, sizeof(ubo));
+	}
+
+	void _createDescriptorSetLayout() {
+		VkDescriptorSetLayoutBinding uboLayoutBinding = {};
+		uboLayoutBinding.binding = 0;
+		uboLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		uboLayoutBinding.descriptorCount = 1;
+		uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		uboLayoutBinding.pImmutableSamplers = nullptr; // Optional
+
+		VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		layoutInfo.bindingCount = 1;
+		layoutInfo.pBindings = &uboLayoutBinding;
+
+		if (vkCreateDescriptorSetLayout(
+				this->_device, 
+				&layoutInfo,
+				nullptr,
+				this->_descriptorSetLayout.replace()
+			) != VK_SUCCESS
+		) {
+			throw std::runtime_error("failed to create descriptor set layout!");
+		}
 	}
 
 	void _createIndexBuffer() {
@@ -169,11 +261,11 @@ class HelloTriangleApplication {
 		this->_createBuffer(
 			bufferSize,
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-			indexBuffer,
-			indexBufferMemory
+			this->_indexBuffer,
+			this->_indexBufferMemory
 		);
 
-		this->_copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+		this->_copyBuffer(stagingBuffer, this->_indexBuffer, bufferSize);
 	}
 
 	void _createVertexBuffer() {
@@ -357,9 +449,9 @@ class HelloTriangleApplication {
 			VkDeviceSize offsets[] = { 0 };
 
 			vkCmdBindVertexBuffers(this->_commandBuffers[i], 0, 1, vertexBuffers, offsets);
-			vkCmdBindIndexBuffer(this->_commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+			vkCmdBindIndexBuffer(this->_commandBuffers[i], this->_indexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
-			vkCmdDrawIndexed(this->_commandBuffers[i], indices.size(), 1, 0, 0, 0);
+			vkCmdDrawIndexed(this->_commandBuffers[i], (uint32_t)indices.size(), 1, 0, 0, 0);
 
 			vkCmdEndRenderPass(this->_commandBuffers[i]);
 
@@ -575,10 +667,11 @@ class HelloTriangleApplication {
 		dynamicState.dynamicStateCount = 2;
 		dynamicState.pDynamicStates = dynamicStates;
 
+		VkDescriptorSetLayout setLayouts[] = { this->_descriptorSetLayout };
 		VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
 		pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipelineLayoutInfo.setLayoutCount = 0; // Optional
-		pipelineLayoutInfo.pSetLayouts = nullptr; // Optional
+		pipelineLayoutInfo.setLayoutCount = 1;
+		pipelineLayoutInfo.pSetLayouts = setLayouts; // Optional
 		pipelineLayoutInfo.pushConstantRangeCount = 0; // Optional
 		pipelineLayoutInfo.pPushConstantRanges = 0; // Optional
 
@@ -845,6 +938,8 @@ class HelloTriangleApplication {
 	void _mainLoop() {
 		while (!glfwWindowShouldClose(this->_window)) {
 			glfwPollEvents();
+
+			this->_updateUniformBuffer();
 			this->_drawFrame();
 		}
 

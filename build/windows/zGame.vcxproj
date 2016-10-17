@@ -21,8 +21,9 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{89ba8c6e-4edd-4a13-bb0b-24c78991698a}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>DrawingTriangle</RootNamespace>
+    <RootNamespace>zGame</RootNamespace>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
+    <ProjectName>zGame</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -90,14 +91,14 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(SolutionDir)\..\shared_modules\src\interface;$(VK_SDK_PATH)\Include;$(SolutionDir)\..\third_party\glfw-3.2.bin.WIN32\include;$(SolutionDir)\..\third_party\glm-0.9.7.6;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\..\..\..\shared_modules\src\interface;$(VK_SDK_PATH)\Include;$(SolutionDir)\..\..\..\third_party\glfw-3.2.bin.WIN32\include;$(SolutionDir)\..\..\..\third_party\glm-0.9.7.6;%(AdditionalIncludeDirectories);$(SolutionDir)\..\..\src\templates;$(SolutionDir)\..\..\src\interface</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)\..\shared_modules\build\windows\x86\Debug\Logger;$(VK_SDK_PATH)\Bin32;$(SolutionDir)\..\third_party\glfw-3.2.bin.WIN32\lib-vc2015;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;Logger.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)\..\..\..\shared_modules\build\windows\x86\Debug\shared_modules;$(VK_SDK_PATH)\Bin32;$(SolutionDir)\..\..\..\third_party\glfw-3.2.bin.WIN32\lib-vc2015;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;shared_modules.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>MSVCRT</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
@@ -108,14 +109,14 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(SolutionDir)\..\shared_modules\src\interface;$(VK_SDK_PATH)\Include;$(SolutionDir)\..\third_party\glfw-3.2.bin.WIN64\include;$(SolutionDir)\..\third_party\glm-0.9.7.6;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\..\..\..\shared_modules\src\interface;$(VK_SDK_PATH)\Include;$(SolutionDir)\..\..\..\third_party\glfw-3.2.bin.WIN64\include;$(SolutionDir)\..\..\..\third_party\glm-0.9.7.6;%(AdditionalIncludeDirectories);$(SolutionDir)\..\..\src\templates;$(SolutionDir)\..\..\src\interface</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)\..\shared_modules\build\windows\x64\Debug\Logger;$(SolutionDir)\..\third_party\glfw-3.2.bin.WIN64\lib-vc2015;$(VK_SDK_PATH)\Bin;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;Logger.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)\..\..\..\shared_modules\build\windows\x64\Debug\shared_modules;$(SolutionDir)\..\..\..\third_party\glfw-3.2.bin.WIN64\lib-vc2015;$(VK_SDK_PATH)\Bin;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;shared_modules.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>MSVCRT</IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
@@ -128,7 +129,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(SolutionDir)\..\shared_modules\src\interface;$(VK_SDK_PATH)\Include;$(SolutionDir)\..\third_party\glfw-3.2.bin.WIN32\include;$(SolutionDir)\..\third_party\glm-0.9.7.6;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\..\..\..\shared_modules\src\interface;$(VK_SDK_PATH)\Include;$(SolutionDir)\..\..\..\third_party\glfw-3.2.bin.WIN32\include;$(SolutionDir)\..\..\..\third_party\glm-0.9.7.6;%(AdditionalIncludeDirectories);$(SolutionDir)\..\..\src\templates;$(SolutionDir)\..\..\src\interface</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -136,8 +137,8 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)\..\shared_modules\build\windows\x86\Release\Logger;$(VK_SDK_PATH)\Bin32;$(SolutionDir)\..\third_party\glfw-3.2.bin.WIN32\lib-vc2015;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;Logger.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)\..\..\..\shared_modules\build\windows\x86\Release\shared_modules;$(VK_SDK_PATH)\Bin32;$(SolutionDir)\..\..\..\third_party\glfw-3.2.bin.WIN32\lib-vc2015;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;shared_modules.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
     </Link>
@@ -151,7 +152,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(SolutionDir)\..\shared_modules\src\interface;$(VK_SDK_PATH)\Include;$(SolutionDir)\..\third_party\glfw-3.2.bin.WIN64\include;$(SolutionDir)\..\third_party\glm-0.9.7.6;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)\..\..\..\shared_modules\src\interface;$(VK_SDK_PATH)\Include;$(SolutionDir)\..\..\..\third_party\glfw-3.2.bin.WIN64\include;$(SolutionDir)\..\..\..\third_party\glm-0.9.7.6;%(AdditionalIncludeDirectories);$(SolutionDir)\..\..\src\templates;$(SolutionDir)\..\..\src\interface</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
@@ -159,24 +160,25 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)\..\shared_modules\build\windows\x64\Release\Logger;$(SolutionDir)\..\third_party\glfw-3.2.bin.WIN64\lib-vc2015;$(VK_SDK_PATH)\Bin;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;Logger.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)\..\..\..\shared_modules\build\windows\x64\Release\shared_modules;$(SolutionDir)\..\..\..\third_party\glfw-3.2.bin.WIN64\lib-vc2015;$(VK_SDK_PATH)\Bin;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>vulkan-1.lib;glfw3.lib;shared_modules.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="VDeleter.hpp" />
+    <ClCompile Include="..\..\src\implementation\windows\main.cpp" />
+    <ClCompile Include="..\..\src\implementation\windows\Vertex.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="HelloTriangleApplication.hpp" />
-    <ClInclude Include="VertexInput.hpp" />
-    <ClInclude Include="zGame.hpp" />
+    <ClInclude Include="..\..\src\interface\HelloTriangleApplication.hpp" />
+    <ClInclude Include="..\..\src\interface\Vertex.hpp" />
+    <ClInclude Include="..\..\src\interface\zGame.hpp" />
+    <ClInclude Include="..\..\src\templates\VDeleter.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="shaders\shader.frag" />
-    <None Include="shaders\shader.vert" />
+    <None Include="..\..\src\shaders\shader.frag" />
+    <None Include="..\..\src\shaders\shader.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
