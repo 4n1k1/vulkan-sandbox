@@ -144,6 +144,8 @@ class GPUBridge {
 	VDeleter<VkBuffer> _uniformBuffer{ this->_device, vkDestroyBuffer };
 	VDeleter<VkDeviceMemory> _uniformBufferMemory{ this->_device, vkFreeMemory };
 	VDeleter<VkDescriptorSetLayout> _descriptorSetLayout{ this->_device, vkDestroyDescriptorSetLayout };
+	VDeleter<VkDescriptorPool> _descriptorPool{ this->_device, vkDestroyDescriptorPool };
+	VkDescriptorSet _descriptorSet;
 
 	void _initWindow() {
 		glfwInit();
@@ -173,8 +175,70 @@ class GPUBridge {
 		this->_createVertexBuffer();
 		this->_createIndexBuffer();
 		this->_createUniformBuffer();
+		this->_createDescriptorPool();
+		this->_createDescriptorSet();
 		this->_createCommandBuffers();
 		this->_createSemaphores();
+	}
+
+	void _createDescriptorSet() {
+		VkDescriptorSetLayout layouts[] = { this->_descriptorSetLayout };
+		VkDescriptorSetAllocateInfo allocInfo = {};
+		allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		allocInfo.descriptorPool = this->_descriptorPool;
+		allocInfo.descriptorSetCount = 1;
+		allocInfo.pSetLayouts = layouts;
+
+		if (
+			vkAllocateDescriptorSets(
+				this->_device,
+				&allocInfo,
+				&(this->_descriptorSet)
+			) != VK_SUCCESS
+		) {
+			throw std::runtime_error("failed to allocate descriptor set!");
+		}
+
+		VkDescriptorBufferInfo bufferInfo = {};
+		bufferInfo.buffer = this->_uniformBuffer;
+		bufferInfo.offset = 0;
+		bufferInfo.range = sizeof(UniformBufferObject);
+
+		VkWriteDescriptorSet descriptorWrite = {};
+		descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrite.dstSet = this->_descriptorSet;
+		descriptorWrite.dstBinding = 0;
+		descriptorWrite.dstArrayElement = 0;
+		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		descriptorWrite.descriptorCount = 1;
+		descriptorWrite.pBufferInfo = &bufferInfo;
+		descriptorWrite.pImageInfo = nullptr; // Optional
+		descriptorWrite.pTexelBufferView = nullptr; // Optional
+
+		vkUpdateDescriptorSets(this->_device, 1, &descriptorWrite, 0, nullptr);
+	}
+
+	void _createDescriptorPool() {
+		VkDescriptorPoolSize poolSize = {};
+		poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		poolSize.descriptorCount = 1;
+
+		VkDescriptorPoolCreateInfo poolInfo = {};
+		poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		poolInfo.poolSizeCount = 1;
+		poolInfo.pPoolSizes = &poolSize;
+		poolInfo.maxSets = 1;
+
+		if (
+			vkCreateDescriptorPool(
+				this->_device,
+				&poolInfo,
+				nullptr,
+				this->_descriptorPool.replace()
+			) != VK_SUCCESS
+		) {
+			throw std::runtime_error("failed to create descriptor pool!");
+		}
 	}
 
 	void _createUniformBuffer() {
@@ -249,7 +313,8 @@ class GPUBridge {
 		VDeleter<VkDeviceMemory> stagingBufferMemory{ this->_device, vkFreeMemory };
 		this->_createBuffer(
 			bufferSize,
-			VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			stagingBuffer,
 			stagingBufferMemory
 		);
@@ -262,7 +327,8 @@ class GPUBridge {
 
 		this->_createBuffer(
 			bufferSize,
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			this->_indexBuffer,
 			this->_indexBufferMemory
 		);
@@ -278,7 +344,8 @@ class GPUBridge {
 
 		this->_createBuffer(
 			bufferSize,
-			VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+			VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
 			stagingBuffer,
 			stagingBufferMemory
 		);
@@ -291,7 +358,8 @@ class GPUBridge {
 
 		this->_createBuffer(
 			bufferSize,
-			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+			VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 			this->_vertexBuffer,
 			this->_vertexBufferMemory
 		);
@@ -456,6 +524,13 @@ class GPUBridge {
 			vkCmdDrawIndexed(this->_commandBuffers[i], (uint32_t)indices.size(), 1, 0, 0, 0);
 
 			vkCmdEndRenderPass(this->_commandBuffers[i]);
+
+			vkCmdBindDescriptorSets(
+				this->_commandBuffers[i],
+				VK_PIPELINE_BIND_POINT_GRAPHICS,
+				this->_pipelineLayout, 0, 1,
+				&(this->_descriptorSet), 0, nullptr
+			);
 
 			if (vkEndCommandBuffer(this->_commandBuffers[i]) != VK_SUCCESS) {
 				throw std::runtime_error("failed to record command buffer!");
@@ -622,7 +697,7 @@ class GPUBridge {
 		rasterizer.rasterizerDiscardEnable = VK_FALSE;
 		rasterizer.polygonMode = VK_POLYGON_MODE_FILL; // VK_POLYGON_MODE_LINE or VK_POLYGON_MODE_POINT
 		rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-		rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+		rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 		rasterizer.lineWidth = 1.0f;
 		rasterizer.depthBiasEnable = VK_FALSE;
 		rasterizer.depthBiasConstantFactor = 0.0f; // Optional
