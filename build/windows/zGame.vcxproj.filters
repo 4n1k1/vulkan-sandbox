@@ -9,9 +9,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\interface\HelloTriangleApplication.hpp">
-      <Filter>interface</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\interface\Vertex.hpp">
       <Filter>interface</Filter>
     </ClInclude>
@@ -20,6 +17,9 @@
     </ClInclude>
     <ClInclude Include="..\..\src\templates\VDeleter.hpp">
       <Filter>templates</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\interface\GPUBridge.hpp">
+      <Filter>interface</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

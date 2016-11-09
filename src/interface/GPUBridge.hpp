@@ -23,6 +23,8 @@
 #define __stdcall
 #endif
 
+namespace zGame {
+
 VkResult CreateDebugReportCallbackEXT(
 	VkInstance instance,
 	const VkDebugReportCallbackCreateInfoEXT* pCreateInfo,
@@ -108,7 +110,7 @@ struct SwapChainSupportDetails {
 	std::vector<VkPresentModeKHR> presentModes;
 };
 
-class HelloTriangleApplication {
+class GPUBridge {
 
 	GLFWwindow* _window;
 	VDeleter<VkInstance> _instance{ vkDestroyInstance };
@@ -152,7 +154,7 @@ class HelloTriangleApplication {
 		this->_window = glfwCreateWindow(WIDTH, HEIGHT, "zGame", nullptr, nullptr);
 
 		glfwSetWindowUserPointer(this->_window, this);
-		glfwSetWindowSizeCallback(this->_window, HelloTriangleApplication::_onWindowResized);
+		glfwSetWindowSizeCallback(this->_window, GPUBridge::_onWindowResized);
 	}
 
 	void _initVulkan() {
@@ -1258,7 +1260,7 @@ class HelloTriangleApplication {
 	static void _onWindowResized(GLFWwindow* window, int width, int height) {
 		if (width == 0 || height == 0) return;
 
-		HelloTriangleApplication* app = reinterpret_cast<HelloTriangleApplication*>(glfwGetWindowUserPointer(window));
+		GPUBridge* app = reinterpret_cast<GPUBridge*>(glfwGetWindowUserPointer(window));
 		app->_recreateSwapChain();
 	}
 
@@ -1270,3 +1272,5 @@ public:
 		this->_mainLoop();
 	}
 };
+
+}

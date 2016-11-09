@@ -171,7 +171,7 @@
     <ClCompile Include="..\..\src\implementation\windows\Vertex.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\interface\HelloTriangleApplication.hpp" />
+    <ClInclude Include="..\..\src\interface\GPUBridge.hpp" />
     <ClInclude Include="..\..\src\interface\Vertex.hpp" />
     <ClInclude Include="..\..\src\interface\zGame.hpp" />
     <ClInclude Include="..\..\src\templates\VDeleter.hpp" />

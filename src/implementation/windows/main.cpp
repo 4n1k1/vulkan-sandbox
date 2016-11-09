@@ -1,5 +1,4 @@
-#include "HelloTriangleApplication.hpp"
-
+#include "GPUBridge.hpp"
 #include "Logger.hpp"
 
 Logger *logger;
@@ -9,9 +8,9 @@ int main() try {
 
 	logger->SetLogFileName("zGame.log");
 
-	HelloTriangleApplication app;
+	zGame::GPUBridge gpu;
 
-	app.run();
+	gpu.run();
 
 	return EXIT_SUCCESS;
 }
