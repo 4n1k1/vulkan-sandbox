@@ -559,8 +559,8 @@ class GPUBridge {
 	}
 
 	void _createGraphicsPipeline() {
-		auto vertShaderCode = this->_readFile("shaders/vert.spv");
-		auto fragShaderCode = this->_readFile("shaders/frag.spv");
+		auto vertShaderCode = this->_readFile("../../src/shaders/vert.spv");
+		auto fragShaderCode = this->_readFile("../../src/shaders/frag.spv");
 
 		VDeleter<VkShaderModule> vertShaderModule{ this->_device, vkDestroyShaderModule };
 		VDeleter<VkShaderModule> fragShaderModule{ this->_device, vkDestroyShaderModule };
