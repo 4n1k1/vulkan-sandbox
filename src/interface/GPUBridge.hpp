@@ -4,6 +4,9 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
+
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
@@ -18,6 +21,7 @@
 #include <algorithm>
 #include <sstream>
 #include <chrono>
+#include <unordered_map>
 
 #include "zGame.hpp"
 #include "VDeleter.hpp"
@@ -66,22 +70,8 @@ void DestroyDebugReportCallbackEXT(
 const int WIDTH = 800;
 const int HEIGHT = 600;
 
-const std::vector<Vertex> vertices = {
-	{ { -0.5f, -0.5f, 0.0f },{ 1.0f, 0.0f, 0.0f },{ 0.0f, 0.0f } },
-	{ { 0.5f, -0.5f, 0.0f },{ 0.0f, 1.0f, 0.0f },{ 1.0f, 0.0f } },
-	{ { 0.5f, 0.5f, 0.0f },{ 0.0f, 0.0f, 1.0f },{ 1.0f, 1.0f } },
-	{ { -0.5f, 0.5f, 0.0f },{ 1.0f, 1.0f, 1.0f },{ 0.0f, 1.0f } },
-
-	{ { -0.5f, -0.5f, -0.5f },{ 1.0f, 0.0f, 0.0f },{ 0.0f, 0.0f } },
-	{ { 0.5f, -0.5f, -0.5f },{ 0.0f, 1.0f, 0.0f },{ 1.0f, 0.0f } },
-	{ { 0.5f, 0.5f, -0.5f },{ 0.0f, 0.0f, 1.0f },{ 1.0f, 1.0f } },
-	{ { -0.5f, 0.5f, -0.5f },{ 1.0f, 1.0f, 1.0f },{ 0.0f, 1.0f } }
-};
-
-const std::vector<uint16_t> indices = {
-	0, 1, 2, 2, 3, 0,
-	4, 5, 6, 6, 7, 4
-};
+const std::string MODEL_PATH = "../../src/models/chalet.obj";
+const std::string TEXTURE_PATH = "../../src/textures/chalet.jpg";
 
 const std::vector<const char*> requiredLayers = {
 	"VK_LAYER_LUNARG_standard_validation"
@@ -145,6 +135,8 @@ class GPUBridge {
 	std::vector<VkCommandBuffer> _commandBuffers;
 	VDeleter<VkSemaphore> _imageAvailableSemaphore{ this->_device, vkDestroySemaphore };
 	VDeleter<VkSemaphore> _renderFinishedSemaphore{ this->_device, vkDestroySemaphore };
+	std::vector<Vertex> _vertices;
+	std::vector<uint32_t> _indices;
 	VDeleter<VkBuffer> _vertexBuffer{ this->_device, vkDestroyBuffer };
 	VDeleter<VkDeviceMemory> _vertexBufferMemory{ this->_device, vkFreeMemory };
 	VDeleter<VkBuffer> _indexBuffer{ this->_device, vkDestroyBuffer };
@@ -195,6 +187,7 @@ class GPUBridge {
 		this->_createTextureImage();
 		this->_createTextureImageView();
 		this->_createTextureSampler();
+		this->_loadModel();
 		this->_createVertexBuffer();
 		this->_createIndexBuffer();
 		this->_createUniformBuffer();
@@ -202,6 +195,45 @@ class GPUBridge {
 		this->_createDescriptorSet();
 		this->_createCommandBuffers();
 		this->_createSemaphores();
+	}
+
+	void _loadModel() {
+		tinyobj::attrib_t attrib;
+		std::vector<tinyobj::shape_t> shapes;
+		std::vector<tinyobj::material_t> materials;
+		std::string err;
+
+		if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, MODEL_PATH.c_str())) {
+			throw std::runtime_error(err);
+		}
+
+		std::unordered_map<Vertex, uint32_t> uniqueVertices = {};
+
+		for (const auto& shape : shapes) {
+			for (const auto& index : shape.mesh.indices) {
+				Vertex vertex = {};
+
+				vertex.pos = {
+					attrib.vertices[3 * index.vertex_index + 0],
+					attrib.vertices[3 * index.vertex_index + 1],
+					attrib.vertices[3 * index.vertex_index + 2]
+				};
+
+				vertex.texCoord = {
+					attrib.texcoords[2 * index.texcoord_index + 0],
+					1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+				};
+
+				vertex.color = { 1.0f, 1.0f, 1.0f };
+
+				if (uniqueVertices.count(vertex) == 0) {
+					uniqueVertices[vertex] = (uint32_t)this->_vertices.size();
+					this->_vertices.push_back(vertex);
+				}
+
+				this->_indices.push_back(uniqueVertices[vertex]);
+			}
+		}
 	}
 
 	void _createDepthResources() {
@@ -486,7 +518,7 @@ class GPUBridge {
 
 	void _createTextureImage() {
 		int texWidth, texHeight, texChannels;
-		stbi_uc* pixels = stbi_load("../../src/textures/texture.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+		stbi_uc* pixels = stbi_load(TEXTURE_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
 		VkDeviceSize imageSize = texWidth * texHeight * 4;
 
 		if (!pixels) {
@@ -691,7 +723,7 @@ class GPUBridge {
 	}
 
 	void _createIndexBuffer() {
-		VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+		VkDeviceSize bufferSize = sizeof(this->_indices[0]) * this->_indices.size();
 
 		VDeleter<VkBuffer> stagingBuffer{ this->_device, vkDestroyBuffer };
 		VDeleter<VkDeviceMemory> stagingBufferMemory{ this->_device, vkFreeMemory };
@@ -706,7 +738,7 @@ class GPUBridge {
 		void* data;
 
 		vkMapMemory(this->_device, stagingBufferMemory, 0, bufferSize, 0, &data);
-		memcpy(data, indices.data(), (size_t)bufferSize);
+		memcpy(data, this->_indices.data(), (size_t)bufferSize);
 		vkUnmapMemory(this->_device, stagingBufferMemory);
 
 		this->_createBuffer(
@@ -721,7 +753,7 @@ class GPUBridge {
 	}
 
 	void _createVertexBuffer() {
-		VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+		VkDeviceSize bufferSize = sizeof(this->_vertices[0]) * this->_vertices.size();
 
 		VDeleter<VkBuffer> stagingBuffer{ this->_device, vkDestroyBuffer };
 		VDeleter<VkDeviceMemory> stagingBufferMemory{ this->_device, vkFreeMemory };
@@ -737,7 +769,7 @@ class GPUBridge {
 		void* data;
 
 		vkMapMemory(this->_device, stagingBufferMemory, 0, bufferSize, 0, &data);
-		memcpy(data, vertices.data(), (size_t)bufferSize);
+		memcpy(data, this->_vertices.data(), (size_t)bufferSize);
 		vkUnmapMemory(this->_device, stagingBufferMemory);
 
 		this->_createBuffer(
@@ -810,6 +842,7 @@ class GPUBridge {
 		this->_createImageViews();
 		this->_createRenderPass();
 		this->_createGraphicsPipeline();
+		this->_createDepthResources();
 		this->_createFramebuffers();
 		this->_createCommandBuffers();
 
@@ -869,9 +902,9 @@ class GPUBridge {
 
 			std::array<VkClearValue, 2> clearValues = {};
 			clearValues[0].color = { 0.0f, 0.0f, 0.0f, 1.0f };
-			clearValues[1].depthStencil = { 1.0f, 0.0f };
+			clearValues[1].depthStencil = { 1.0f, 0 };
 
-			renderPassInfo.clearValueCount = clearValues.size();
+			renderPassInfo.clearValueCount = (uint32_t)clearValues.size();
 			renderPassInfo.pClearValues = clearValues.data();
 
 			vkCmdBeginRenderPass(this->_commandBuffers[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
@@ -882,9 +915,9 @@ class GPUBridge {
 			VkDeviceSize offsets[] = { 0 };
 
 			vkCmdBindVertexBuffers(this->_commandBuffers[i], 0, 1, vertexBuffers, offsets);
-			vkCmdBindIndexBuffer(this->_commandBuffers[i], this->_indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+			vkCmdBindIndexBuffer(this->_commandBuffers[i], this->_indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-			vkCmdDrawIndexed(this->_commandBuffers[i], (uint32_t)indices.size(), 1, 0, 0, 0);
+			vkCmdDrawIndexed(this->_commandBuffers[i], (uint32_t)this->_indices.size(), 1, 0, 0, 0);
 
 			vkCmdEndRenderPass(this->_commandBuffers[i]);
 
@@ -927,7 +960,7 @@ class GPUBridge {
 			VkFramebufferCreateInfo framebufferInfo = {};
 			framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 			framebufferInfo.renderPass = this->_renderPass;
-			framebufferInfo.attachmentCount = attachments.size();
+			framebufferInfo.attachmentCount = (uint32_t)attachments.size();
 			framebufferInfo.pAttachments = attachments.data();
 			framebufferInfo.width = this->_swapChainExtent.width;
 			framebufferInfo.height = this->_swapChainExtent.height;
@@ -992,7 +1025,7 @@ class GPUBridge {
 		std::array<VkAttachmentDescription, 2> attachments = { colorAttachment, depthAttachment };
 		VkRenderPassCreateInfo renderPassInfo = {};
 		renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-		renderPassInfo.attachmentCount = attachments.size();
+		renderPassInfo.attachmentCount = (uint32_t)attachments.size();
 		renderPassInfo.pAttachments = attachments.data();
 		renderPassInfo.subpassCount = 1;
 		renderPassInfo.pSubpasses = &subPass;
