@@ -1,21 +1,23 @@
-#include "GPUBridge.hpp"
-#include "Logger.hpp"
+#include <stdio.h>
+#include <stdlib.h>
 
-Logger *logger;
+#include "system_bridge.h"
 
-int main() try {
-	logger = new Logger();
+int main(int argc, char** argv) {
+	if (!setup_window_and_gpu())
+	{
+		printf("Error while window/gpu setup.\n");
 
-	logger->SetLogFileName("zGame.log");
+		return EXIT_FAILURE;
+	}
 
-	zGame::GPUBridge gpu;
+	if (!destroy_window_and_free_gpu())
+	{
+		printf("Error releasing resources.\n");
 
-	gpu.run();
+		return EXIT_FAILURE;
+
+	}
 
 	return EXIT_SUCCESS;
-}
-catch (const std::runtime_error& e) {
-	LOG_DEBUG(e.what());
-
-	return EXIT_FAILURE;
 }

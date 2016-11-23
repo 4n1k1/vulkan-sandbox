@@ -7,6 +7,12 @@
     <ClCompile Include="..\..\src\implementation\windows\Vertex.cpp">
       <Filter>implementation</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\implementation\windows\system_bridge.c">
+      <Filter>implementation</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\implementation\windows\memory_pool.c">
+      <Filter>implementation</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\interface\Vertex.hpp">
@@ -19,6 +25,12 @@
       <Filter>templates</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\interface\GPUBridge.hpp">
+      <Filter>interface</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\interface\system_bridge.h">
+      <Filter>interface</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\interface\memory_pool.h">
       <Filter>interface</Filter>
     </ClInclude>
   </ItemGroup>
