@@ -1,21 +1,25 @@
+#include <GLFW/glfw3.h>
+
 #include <vulkan/vulkan.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 #ifdef NDEBUG
-const int enableValidationLayers = 0;
+const int enable_validation_layers = 0;
 #else
-const int enableValidationLayers = 1;
+const int enable_validation_layers = 1;
 #endif
 
 struct _required_validation_layers
 {
-	const char** data;
+	const char **layer_names;
 	uint32_t size;
 };
 
 struct _required_instance_extensions
 {
-	const char** data;
+	char** extension_names;
 	uint32_t size;
 };
 
@@ -27,7 +31,7 @@ int setup_window_and_gpu()
 
 	_set_required_layers(rvls);
 
-	if (enableValidationLayers)
+	if (enable_validation_layers)
 	{
 		if (!_check_validation_layers_support(rvls))
 		{
@@ -52,21 +56,33 @@ int setup_window_and_gpu()
 
 int destroy_window_and_free_gpu()
 {
+	free()
 	return 1;
 }
 
 static void _set_required_layers(struct _required_validation_layers* rvls)
 {
-	rvls->data[0] = "VK_LAYER_LUNARG_standard_validation";
+	rvls->layer_names[0] = "VK_LAYER_LUNARG_standard_validation";
 	rvls->size = 1;
 }
 
 static void _set_required_extensions(struct _required_instance_extensions* ries)
 {
-	ries->data = glfwGetRequiredInstanceExtensions(&(ries->size));
+	uint16_t glfw_required_exts_num;
 
-	ries->data[ries->size] = VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
-	ries->size += 1;
+	const char **glfw_required_exts = glfwGetRequiredInstanceExtensions(
+		&glfw_required_exts_num
+	);
+
+	ries->extension_names = malloc(VK_MAX_EXTENSION_NAME_SIZE * glfw_required_exts_num + 1);
+
+	for (uint16_t i = 0; i < glfw_required_exts_num; i += 1)
+	{
+		ries->extension_names[i] = glfw_required_exts[i];
+	}
+
+	ries->extension_names[glfw_required_exts_num] = VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
+	ries->size = glfw_required_exts_num + 1;
 }
 
 static int _create_instance(
@@ -86,10 +102,10 @@ static int _create_instance(
 	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 	createInfo.pApplicationInfo = &appInfo;
 
-	if (enableValidationLayers)
+	if (enable_validation_layers)
 	{
 		createInfo.enabledLayerCount = rvls->size;
-		createInfo.ppEnabledLayerNames = rvls->data;
+		createInfo.ppEnabledLayerNames = rvls->layer_names;
 	}
 	else
 	{
@@ -97,7 +113,7 @@ static int _create_instance(
 	}
 
 	createInfo.enabledExtensionCount = ries->size;
-	createInfo.ppEnabledExtensionNames = ries->data;
+	createInfo.ppEnabledExtensionNames = ries->extension_names;
 
 	if (VK_SUCCESS != vkCreateInstance(&createInfo, NULL, &_instance))
 	{
@@ -109,18 +125,18 @@ static int _create_instance(
 
 static int _check_validation_layers_support(struct _required_validation_layers* rls)
 {
-	uint32_t layerCount;
-	vkEnumerateInstanceLayerProperties(&layerCount, NULL);
+	uint32_t supported_layer_num;
+	vkEnumerateInstanceLayerProperties(&supported_layer_num, NULL);
 
-	VkLayerProperties layerProperties*
-	std::vector<VkLayerProperties> supportedLayers(layerCount);
-	vkEnumerateInstanceLayerProperties(&layerCount, supportedLayers.data());
+	VkLayerProperties *supported_layers = malloc(sizeof(VkLayerProperties) * supported_layer_num);
 
-	for (const char* layerName : requiredLayers) {
-		int layerFound = 0;
+	vkEnumerateInstanceLayerProperties(&supported_layer_num, supported_layers);
 
-		for (const auto& layerProperties : supportedLayers) {
-			if (strcmp(layerName, layerProperties.layerName) == 0) {
+	for (uint16_t i = 0; i < rls->size; i += 1) {
+		int layer_found = 0;
+
+		for (uint16_t j = 0; j < supported_layer_num; j += 1) {
+			if (strcmp(supported_layers[j].layerName, layerName, layerProperties.layerName) == 0) {
 				layerFound = 1;
 				break;
 			}
