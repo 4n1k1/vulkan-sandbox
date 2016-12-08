@@ -89,26 +89,8 @@ struct UniformBufferObject {
 #ifdef NDEBUG
 const bool enableValidationLayers = false;
 #else
-const bool enable_validation_layers = true;
+const bool _enable_validation_layers = true;
 #endif
-
-struct QueueFamilyIndices {
-	int graphicsFamily = -1;
-	int presentFamily = -1;
-
-	bool isComplete() {
-		return graphicsFamily >= 0 && presentFamily >= 0;
-	}
-
-	bool useSameFamily() {
-		return graphicsFamily == presentFamily;
-	}
-};
-struct SwapChainSupportDetails {
-	VkSurfaceCapabilitiesKHR capabilities;
-	std::vector<VkSurfaceFormatKHR> formats;
-	std::vector<VkPresentModeKHR> presentModes;
-};
 
 class GPUBridge {
 
@@ -1280,7 +1262,7 @@ class GPUBridge {
 
 		createInfo.enabledExtensionCount = 0;
 
-		if (enable_validation_layers) {
+		if (_enable_validation_layers) {
 			createInfo.enabledLayerCount = (uint32_t)requiredLayers.size();
 			createInfo.ppEnabledLayerNames = requiredLayers.data();
 		} else {
@@ -1406,7 +1388,7 @@ class GPUBridge {
 	}
 
 	void _setupDebugCallback() {
-		if (!enable_validation_layers) return;
+		if (!_enable_validation_layers) return;
 
 		VkDebugReportCallbackCreateInfoEXT createInfo = {};
 		createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
@@ -1499,7 +1481,7 @@ class GPUBridge {
 		createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
 		createInfo.pApplicationInfo = &appInfo;
 
-		if (enable_validation_layers && !this->_checkValidationLayerSupport()) {
+		if (_enable_validation_layers && !this->_checkValidationLayerSupport()) {
 			throw std::runtime_error("validation layers requested, but not available!");
 		}
 
@@ -1515,7 +1497,7 @@ class GPUBridge {
 		// assuming VK_EXT_DEBUG_REPORT_EXTENSION_NAME extension is supported
 		this->_validExtensions.push_back(VK_EXT_DEBUG_REPORT_EXTENSION_NAME);
 
-		if (enable_validation_layers) {
+		if (_enable_validation_layers) {
 			createInfo.enabledLayerCount = (uint32_t)requiredLayers.size();
 			createInfo.ppEnabledLayerNames = requiredLayers.data();
 		}

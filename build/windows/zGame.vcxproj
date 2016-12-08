@@ -179,18 +179,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\src\implementation\windows\main.cpp" />
+    <ClCompile Include="..\..\src\implementation\windows\main.c" />
     <ClCompile Include="..\..\src\implementation\windows\memory_pool.c" />
     <ClCompile Include="..\..\src\implementation\windows\system_bridge.c" />
-    <ClCompile Include="..\..\src\implementation\windows\Vertex.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\interface\GPUBridge.hpp" />
     <ClInclude Include="..\..\src\interface\memory_pool.h" />
     <ClInclude Include="..\..\src\interface\system_bridge.h" />
-    <ClInclude Include="..\..\src\interface\Vertex.hpp" />
-    <ClInclude Include="..\..\src\interface\zGame.hpp" />
-    <ClInclude Include="..\..\src\templates\VDeleter.hpp" />
+    <ClInclude Include="..\..\src\interface\z_game.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\src\shaders\shader.frag" />
