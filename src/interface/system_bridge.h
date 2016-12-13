@@ -56,5 +56,12 @@ typedef struct SwapChainImages
 
 } SwapChainImages;
 
+typedef struct SwapChainImageViews
+{
+	VkImageView *image_views;
+	uint image_views_num;
+
+} SwapChainImageViews;
+
 bool setup_window_and_gpu();
 void destroy_window_and_free_gpu();

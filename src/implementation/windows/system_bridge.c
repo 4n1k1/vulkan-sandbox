@@ -34,6 +34,7 @@ static VkQueue _graphics_queue;
 static VkQueue _present_queue;
 static VkSwapchainKHR _swap_chain;
 static SwapChainImages _swap_chain_images;
+static SwapChainImageViews _swap_chain_image_views;
 static VkFormat _swap_chain_image_format;
 static VkExtent2D _extent;
 
@@ -153,7 +154,23 @@ static void _set_swap_chain_support(const VkPhysicalDevice *physical_device) {
 		vkGetPhysicalDeviceSurfacePresentModesKHR(*physical_device, _surface, &(alias->present_modes_num), alias->present_modes);
 	}
 }
+static void _set_swap_chain_image_views()
+{
+	_swap_chain_image_views.image_views_num = _swap_chain_images.images_num;
+	_swap_chain_image_views.image_views = malloc(
+		sizeof(VkImageView) * _swap_chain_image_views.image_views_num
+	);
 
+	for (uint32_t i = 0; i < this->_swapChainImages.size(); i++) {
+		this->_createImageView(
+			this->_swapChainImages[i],
+			this->_swapChainImageFormat,
+			VK_IMAGE_ASPECT_COLOR_BIT,
+			this->_swapChainImageViews[i]
+		);
+	}
+
+}
 static bool _instance_supports_required_layers()
 {
 	uint supported_layers_num;
@@ -572,7 +589,11 @@ bool setup_window_and_gpu()
 		return false;
 	}
 
-	if (!_create_swap_chain())
+	if (_create_swap_chain())
+	{
+		_set_swap_chain_image_views();
+	}
+	else
 	{
 		printf("Failed to create swap chain.");
 
@@ -595,6 +616,11 @@ static void _clear_debug_callback()
 
 void destroy_window_and_free_gpu()
 {
+	for (uint i = 0; i < _swap_chain_image_views.image_views_num; i += 1)
+	{
+		vkDestroyImageView(_device, _swap_chain_image_views.image_views[i], NULL);
+	}
+	free(_swap_chain_image_views.image_views);
 	free(_swap_chain_images.images);
 
 	vkDestroySwapchainKHR(_device, _swap_chain, NULL);
