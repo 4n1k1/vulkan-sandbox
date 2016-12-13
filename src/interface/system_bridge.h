@@ -1,5 +1,6 @@
 #include "z_game.h"
 
+#include <stdbool.h>
 #include <vulkan/vulkan.h>
 
 typedef struct RequiredValidationLayers
@@ -47,6 +48,13 @@ typedef struct RequiredPhysicalDeviceExtensions
 	uint exts_num;
 
 } RequiredPhysicalDeviceExtensions;
+
+typedef struct SwapChainImages
+{
+	VkImage *images;
+	uint images_num;
+
+} SwapChainImages;
 
 bool setup_window_and_gpu();
 void destroy_window_and_free_gpu();

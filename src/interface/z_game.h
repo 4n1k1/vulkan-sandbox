@@ -5,12 +5,7 @@
 #include "Logger.hpp"
 */
 
-#define TRUE 1
-#define FALSE 0
-
 #define uint unsigned int
-
-#define bool uint
 
 #ifndef WIN32
 #define __stdcall

@@ -4,14 +4,15 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include "z_game.h"
 #include "system_bridge.h"
 
 #ifdef NDEBUG
-const bool _enable_validation_layers = FALSE;
+const bool _enable_validation_layers = false;
 #else
-const bool _enable_validation_layers = TRUE;
+const bool _enable_validation_layers = true;
 #endif
 
 static uint _WINDOW_WIDTH = 800;
@@ -19,15 +20,22 @@ static uint _WINDOW_HEIGHT = 600;
 
 static RequiredGLFWExtensions _required_glfw_extensions;
 static RequiredPhysicalDeviceExtensions _required_physical_device_extensions;
-static ExtensionsToEnable _extensions_to_enable;
+static ExtensionsToEnable _instance_extensions_to_enable;
 static RequiredValidationLayers _required_validation_layers;
 static VkInstance _instance;
 static VkDebugReportCallbackEXT _debug_callback_object;
-static GLFWwindow* _window = NULL;
+static GLFWwindow *_window = NULL;
 static VkSurfaceKHR _surface;
 static VkPhysicalDevice _physical_device = VK_NULL_HANDLE;
 static PhysicalDeviceQueueFamilies _physical_device_queue_families;
 static PhysicalDeviceSwapChainSupport _physical_device_swap_chain_support;
+static VkDevice _device;
+static VkQueue _graphics_queue;
+static VkQueue _present_queue;
+static VkSwapchainKHR _swap_chain;
+static SwapChainImages _swap_chain_images;
+static VkFormat _swap_chain_image_format;
+static VkExtent2D _extent;
 
 static inline bool _is_complete(const PhysicalDeviceQueueFamilies *indicies) {
 	return indicies->graphics_family_idx >= 0 && indicies->present_family_idx >= 0;
@@ -40,6 +48,22 @@ static void _on_window_resize(GLFWwindow* window, int width, int height)
 {
 
 }
+static VkBool32 __stdcall _debug_callback_function(
+	VkDebugReportFlagsEXT flags,
+	VkDebugReportObjectTypeEXT objType,
+	uint64_t obj,
+	size_t location,
+	int32_t code,
+	const char* layerPrefix,
+	const char* msg,
+	void* userData
+)
+{
+	printf("Validation layer: %s.\n", msg);
+
+	return VK_FALSE;
+}
+
 static void _set_required_validation_layers()
 {
 	_required_validation_layers.layer_names[0] = "VK_LAYER_LUNARG_standard_validation";
@@ -60,7 +84,7 @@ static void _set_extensions_to_enable()
 {
 	uint extensions_num = _required_glfw_extensions.exts_num + 1;
 
-	_extensions_to_enable.extension_names = malloc(
+	_instance_extensions_to_enable.extension_names = malloc(
 		sizeof(char **) * extensions_num
 	);
 
@@ -68,96 +92,14 @@ static void _set_extensions_to_enable()
 
 	for (uint i = 0; i < _required_glfw_extensions.exts_num; i += 1)
 	{
-		_extensions_to_enable.extension_names[extension_to_enable_idx] = _required_glfw_extensions.extension_names[i];
+		_instance_extensions_to_enable.extension_names[extension_to_enable_idx] = _required_glfw_extensions.extension_names[i];
 		extension_to_enable_idx += 1;
 	}
 
-	_extensions_to_enable.extension_names[extension_to_enable_idx] = VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
+	_instance_extensions_to_enable.extension_names[extension_to_enable_idx] = VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
 
-	_extensions_to_enable.exts_num = extensions_num;
+	_instance_extensions_to_enable.exts_num = extensions_num;
 }
-
-static VkBool32 __stdcall _debug_callback_function(
-	VkDebugReportFlagsEXT flags,
-	VkDebugReportObjectTypeEXT objType,
-	uint64_t obj,
-	size_t location,
-	int32_t code,
-	const char* layerPrefix,
-	const char* msg,
-	void* userData
-)
-{
-	printf("Validation layer: %s.\n", msg);
-
-	return VK_FALSE;
-}
-
-static bool _instance_supports_required_layers()
-{
-	uint supported_layers_num;
-	vkEnumerateInstanceLayerProperties(&supported_layers_num, NULL);
-
-	VkLayerProperties *supported_layers = malloc(sizeof(VkLayerProperties) * supported_layers_num);
-
-	vkEnumerateInstanceLayerProperties(&supported_layers_num, supported_layers);
-
-	bool result = TRUE;
-
-	for (uint i = 0; i < _required_validation_layers.layers_num; i += 1) {
-		bool layer_found = FALSE;
-
-		for (uint j = 0; j < supported_layers_num; j += 1) {
-			if (strcmp(supported_layers[j].layerName, _required_validation_layers.layer_names[i]) == 0) {
-				layer_found = TRUE;
-				break;
-			}
-		}
-
-		if (!layer_found)
-		{
-			result = FALSE;
-			break;
-		}
-	}
-
-	free(supported_layers);
-
-	return result;
-}
-static bool _instance_supports_required_extensions()
-{
-	uint supported_exts_num = 0;
-	vkEnumerateInstanceExtensionProperties(NULL, &supported_exts_num, NULL);
-
-	VkExtensionProperties *supported_exts = malloc(sizeof(VkExtensionProperties) * supported_exts_num);
-	vkEnumerateInstanceExtensionProperties(NULL, &supported_exts_num, supported_exts);
-
-	bool result = TRUE;
-
-	for (uint i = 0; i < _required_glfw_extensions.exts_num; i += 1) {
-		bool ext_found = FALSE;
-
-		for (uint j = 0; j < supported_exts_num; j += 1) {
-			if (strcmp(supported_exts[j].extensionName, _required_glfw_extensions.extension_names[i]) == 0) {
-				ext_found = TRUE;
-				break;
-			}
-		}
-
-		if (!ext_found)
-		{
-			result = FALSE;
-			break;
-		}
-
-	}
-
-	free(supported_exts);
-
-	return result;
-}
-
 static void _set_queue_family_properties(const VkPhysicalDevice *physical_device)
 {
 	uint32_t queue_families_num = 0;
@@ -212,6 +154,70 @@ static void _set_swap_chain_support(const VkPhysicalDevice *physical_device) {
 	}
 }
 
+static bool _instance_supports_required_layers()
+{
+	uint supported_layers_num;
+	vkEnumerateInstanceLayerProperties(&supported_layers_num, NULL);
+
+	VkLayerProperties *supported_layers = malloc(sizeof(VkLayerProperties) * supported_layers_num);
+
+	vkEnumerateInstanceLayerProperties(&supported_layers_num, supported_layers);
+
+	bool result = true;
+
+	for (uint i = 0; i < _required_validation_layers.layers_num; i += 1) {
+		bool layer_found = false;
+
+		for (uint j = 0; j < supported_layers_num; j += 1) {
+			if (strcmp(supported_layers[j].layerName, _required_validation_layers.layer_names[i]) == 0) {
+				layer_found = true;
+				break;
+			}
+		}
+
+		if (!layer_found)
+		{
+			result = false;
+			break;
+		}
+	}
+
+	free(supported_layers);
+
+	return result;
+}
+static bool _instance_supports_required_extensions()
+{
+	uint supported_exts_num = 0;
+	vkEnumerateInstanceExtensionProperties(NULL, &supported_exts_num, NULL);
+
+	VkExtensionProperties *supported_exts = malloc(sizeof(VkExtensionProperties) * supported_exts_num);
+	vkEnumerateInstanceExtensionProperties(NULL, &supported_exts_num, supported_exts);
+
+	bool result = true;
+
+	for (uint i = 0; i < _required_glfw_extensions.exts_num; i += 1) {
+		bool ext_found = false;
+
+		for (uint j = 0; j < supported_exts_num; j += 1) {
+			if (strcmp(supported_exts[j].extensionName, _required_glfw_extensions.extension_names[i]) == 0) {
+				ext_found = true;
+				break;
+			}
+		}
+
+		if (!ext_found)
+		{
+			result = false;
+			break;
+		}
+
+	}
+
+	free(supported_exts);
+
+	return result;
+}
 static bool _physical_device_supports_required_extensions(const VkPhysicalDevice* physical_device) {
 	uint32_t supported_exts_num;
 	vkEnumerateDeviceExtensionProperties(*physical_device, NULL, &supported_exts_num, NULL);
@@ -249,7 +255,7 @@ static bool _physical_device_suitable(const VkPhysicalDevice* physical_device) {
 
 	bool extensions_supported = _physical_device_supports_required_extensions(physical_device);
 
-	bool swap_chain_supported = FALSE;
+	bool swap_chain_supported = false;
 
 	if (extensions_supported) {
 		_set_swap_chain_support(physical_device);
@@ -257,7 +263,7 @@ static bool _physical_device_suitable(const VkPhysicalDevice* physical_device) {
 		swap_chain_supported = (
 			_physical_device_swap_chain_support.formats_num != 0 &&
 			_physical_device_swap_chain_support.present_modes_num != 0
-		);
+			);
 	}
 
 	return (
@@ -266,7 +272,39 @@ static bool _physical_device_suitable(const VkPhysicalDevice* physical_device) {
 		_use_same_family(&_physical_device_queue_families) &&
 		extensions_supported &&
 		swap_chain_supported
-	);
+		);
+}
+
+static void _pick_swap_chain_surface_format(VkSurfaceFormatKHR *picked_surface_format) {
+	VkSurfaceFormatKHR *supported_formats = _physical_device_swap_chain_support.formats;
+	uint supported_formats_num = _physical_device_swap_chain_support.formats_num;
+
+	if (supported_formats_num == 1 && supported_formats[0].format == VK_FORMAT_UNDEFINED) {
+		picked_surface_format->format = VK_FORMAT_B8G8R8A8_UNORM;
+		picked_surface_format->colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+
+		return;
+	}
+
+	for (uint i = 0; i < supported_formats_num; i += 1)
+	{
+		if (supported_formats[i].format == VK_FORMAT_B8G8R8A8_UNORM && supported_formats[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+		{
+			picked_surface_format->format = supported_formats[i].format;
+			picked_surface_format->colorSpace = supported_formats[i].colorSpace;
+
+			return;
+		}
+	}
+}
+static void _pick_swap_chain_present_mode(VkPresentModeKHR *present_mode) {
+	for (uint i = 0; i < _physical_device_swap_chain_support.present_modes_num; i += 1) {
+		if (_physical_device_swap_chain_support.present_modes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
+			*present_mode = _physical_device_swap_chain_support.present_modes[i];
+		}
+	}
+
+	*present_mode = VK_PRESENT_MODE_FIFO_KHR;
 }
 
 static bool _init_window()
@@ -278,12 +316,12 @@ static bool _init_window()
 
 	if (!_window)
 	{
-		return FALSE;
+		return false;
 	}
 
 	glfwSetWindowSizeCallback(_window, _on_window_resize);
 
-	return TRUE;
+	return true;
 }
 static bool _create_instance()
 {
@@ -311,14 +349,14 @@ static bool _create_instance()
 		create_info.enabledLayerCount = 0;
 	}
 
-	create_info.enabledExtensionCount = _extensions_to_enable.exts_num;
-	create_info.ppEnabledExtensionNames = _extensions_to_enable.extension_names;
+	create_info.enabledExtensionCount = _instance_extensions_to_enable.exts_num;
+	create_info.ppEnabledExtensionNames = _instance_extensions_to_enable.extension_names;
 
 	return VK_SUCCESS == vkCreateInstance(&create_info, NULL, &_instance);
 }
 static bool _setup_debug_callback()
 {
-	if (!_enable_validation_layers) return TRUE;
+	if (!_enable_validation_layers) return true;
 
 	VkDebugReportCallbackCreateInfoEXT create_info = {
 		.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT,
@@ -332,12 +370,12 @@ static bool _setup_debug_callback()
 
 	if (func == NULL)
 	{
-		return FALSE;
+		return false;
 	}
 
 	func(_instance, &create_info, NULL, &_debug_callback_object);
 
-	return TRUE;
+	return true;
 }
 static bool _pick_physical_device() {
 	uint devices_num = 0;
@@ -347,12 +385,12 @@ static bool _pick_physical_device() {
 	VkPhysicalDevice *devices = malloc(sizeof(VkPhysicalDevice) * devices_num);
 	vkEnumeratePhysicalDevices(_instance, &devices_num, devices);
 
-	bool result = TRUE;
+	bool result = true;
 
 	if (devices_num == 0) {
 		printf("Failed to find GPUs with Vulkan support.");
 
-		result = FALSE;
+		result = false;
 	}
 	else
 	{
@@ -365,7 +403,7 @@ static bool _pick_physical_device() {
 		}
 
 		if (_physical_device == VK_NULL_HANDLE) {
-			result = FALSE;
+			result = false;
 		}
 	}
 
@@ -373,6 +411,93 @@ static bool _pick_physical_device() {
 
 	return result;
 };
+static bool _create_logical_device()
+{
+	float queuePriority = 1.0f;
+
+	VkDeviceQueueCreateInfo queue_create_info = {
+		.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+		.queueFamilyIndex = _physical_device_queue_families.graphics_family_idx,
+		.queueCount = 1,
+		.pQueuePriorities = &queuePriority,
+	};
+
+	VkPhysicalDeviceFeatures device_features;
+	vkGetPhysicalDeviceFeatures(_physical_device, &device_features);
+
+	VkDeviceCreateInfo create_info = {
+		.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+		.pQueueCreateInfos = &queue_create_info,
+		.queueCreateInfoCount = 1,
+		.pEnabledFeatures = &device_features,
+		.enabledExtensionCount = 0
+	};
+
+	if (_enable_validation_layers) {
+		create_info.enabledLayerCount = _required_validation_layers.layers_num;
+		create_info.ppEnabledLayerNames = _required_validation_layers.layer_names;
+	}
+	else
+	{
+		create_info.enabledLayerCount = 0;
+	}
+
+	create_info.enabledExtensionCount = _required_physical_device_extensions.exts_num;
+	create_info.ppEnabledExtensionNames = _required_physical_device_extensions.extension_names;
+
+	if (
+		vkCreateDevice(_physical_device, &create_info, NULL, &_device) != VK_SUCCESS
+	) {
+		return false;
+	}
+
+	vkGetDeviceQueue(_device, _physical_device_queue_families.graphics_family_idx, 0, &_graphics_queue);
+	vkGetDeviceQueue(_device, _physical_device_queue_families.present_family_idx, 0, &_present_queue);
+
+	return true;
+}
+static bool _create_swap_chain()
+{
+	VkSurfaceFormatKHR picked_surface_format;
+	_pick_swap_chain_surface_format(&picked_surface_format);
+
+	VkPresentModeKHR picked_present_mode;
+	_pick_swap_chain_present_mode(&picked_present_mode);
+
+	_extent.width = _WINDOW_WIDTH;
+	_extent.height = _WINDOW_HEIGHT;
+
+	VkSwapchainCreateInfoKHR createInfo = {
+		.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+		.surface = _surface,
+		.minImageCount = _physical_device_swap_chain_support.capabilities.minImageCount,
+		.imageFormat = picked_surface_format.format,
+		.imageColorSpace = picked_surface_format.colorSpace,
+		.imageExtent = _extent,
+		.imageArrayLayers = 1,
+		.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+		.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
+		.preTransform = _physical_device_swap_chain_support.capabilities.currentTransform,
+		.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+		.presentMode = picked_present_mode,
+		.clipped = VK_TRUE
+	};
+
+	if (vkCreateSwapchainKHR(_device, &createInfo, NULL, &(_swap_chain)) != VK_SUCCESS)
+	{
+		return false;
+	}
+
+	vkGetSwapchainImagesKHR(_device, _swap_chain, &(_swap_chain_images.images_num), NULL);
+
+	_swap_chain_images.images = malloc(sizeof(VkImage) * _swap_chain_images.images_num);
+
+	vkGetSwapchainImagesKHR(_device, _swap_chain, &(_swap_chain_images.images_num), _swap_chain_images.images);
+
+	_swap_chain_image_format = picked_surface_format.format;
+
+	return true;
+}
 
 bool setup_window_and_gpu()
 {
@@ -380,7 +505,7 @@ bool setup_window_and_gpu()
 	{
 		printf("Failed to initialize GLFW.");
 
-		return FALSE;
+		return false;
 	}
 
 	_set_required_validation_layers();
@@ -394,7 +519,7 @@ bool setup_window_and_gpu()
 		{
 			printf("Validation layers requested, but not available.\n");
 
-			return FALSE;
+			return false;
 		}
 	}
 
@@ -402,45 +527,59 @@ bool setup_window_and_gpu()
 	{
 		printf("Some extensions are not supported.\n");
 
-		return FALSE;
+		return false;
 	}
 
 	if (!_create_instance())
 	{
 		printf("Failed to create instance.\n");
 
-		return FALSE;
+		return false;
 	}
 
 	if (!_setup_debug_callback())
 	{
 		printf("Failed to set up debug callback.\n");
 
-		return FALSE;
+		return false;
 	}
 
 	if (!_init_window())
 	{
 		printf("Failed to init window.");
 
-		return FALSE;
+		return false;
 	}
 
 	if (VK_SUCCESS != glfwCreateWindowSurface(_instance, _window, NULL, &(_surface)))
 	{
 		printf("Failed to create surface.\n");
 
-		return FALSE;
+		return false;
 	}
 
 	if (!_pick_physical_device())
 	{
 		printf("Failed to find suitable GPU.");
 
-		return FALSE;
+		return false;
 	}
 
-	return TRUE;
+	if (!_create_logical_device())
+	{
+		printf("Failed to create logical device.");
+
+		return false;
+	}
+
+	if (!_create_swap_chain())
+	{
+		printf("Failed to create swap chain.");
+
+		return false;
+	}
+
+	return true;
 }
 
 static void _clear_debug_callback()
@@ -456,9 +595,14 @@ static void _clear_debug_callback()
 
 void destroy_window_and_free_gpu()
 {
+	free(_swap_chain_images.images);
+
+	vkDestroySwapchainKHR(_device, _swap_chain, NULL);
+	vkDestroyDevice(_device, NULL);
+
 	free(_physical_device_swap_chain_support.formats);
 	free(_physical_device_swap_chain_support.present_modes);
-	free((void *)_extensions_to_enable.extension_names);
+	free((void *)_instance_extensions_to_enable.extension_names);
 
 	vkDestroySurfaceKHR(_instance, _surface, NULL);
 
