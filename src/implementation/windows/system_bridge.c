@@ -35,8 +35,11 @@ static VkQueue _present_queue;
 static VkSwapchainKHR _swap_chain;
 static SwapChainImages _swap_chain_images;
 static SwapChainImageViews _swap_chain_image_views;
-static VkFormat _swap_chain_image_format;
+static VkFormat _color_buffer_format;
+static VkFormat _depth_buffer_format;
 static VkExtent2D _extent;
+static VkRenderPass _render_pass;
+static VkDescriptorSetLayout _descriptor_set_layout;
 
 static inline bool _is_complete(const PhysicalDeviceQueueFamilies *indicies) {
 	return indicies->graphics_family_idx >= 0 && indicies->present_family_idx >= 0;
@@ -154,23 +157,7 @@ static void _set_swap_chain_support(const VkPhysicalDevice *physical_device) {
 		vkGetPhysicalDeviceSurfacePresentModesKHR(*physical_device, _surface, &(alias->present_modes_num), alias->present_modes);
 	}
 }
-static void _set_swap_chain_image_views()
-{
-	_swap_chain_image_views.image_views_num = _swap_chain_images.images_num;
-	_swap_chain_image_views.image_views = malloc(
-		sizeof(VkImageView) * _swap_chain_image_views.image_views_num
-	);
 
-	for (uint32_t i = 0; i < this->_swapChainImages.size(); i++) {
-		this->_createImageView(
-			this->_swapChainImages[i],
-			this->_swapChainImageFormat,
-			VK_IMAGE_ASPECT_COLOR_BIT,
-			this->_swapChainImageViews[i]
-		);
-	}
-
-}
 static bool _instance_supports_required_layers()
 {
 	uint supported_layers_num;
@@ -511,7 +498,162 @@ static bool _create_swap_chain()
 
 	vkGetSwapchainImagesKHR(_device, _swap_chain, &(_swap_chain_images.images_num), _swap_chain_images.images);
 
-	_swap_chain_image_format = picked_surface_format.format;
+	_color_buffer_format = picked_surface_format.format;
+
+	return true;
+}
+static bool _create_swap_chain_image_views()
+{
+	_swap_chain_image_views.image_views_num = _swap_chain_images.images_num;
+	_swap_chain_image_views.image_views = malloc(
+		sizeof(VkImageView) * _swap_chain_image_views.image_views_num
+	);
+
+	for (uint i = 0; i < _swap_chain_images.images_num; i++)
+	{
+		VkImageViewCreateInfo view_info = {
+			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+			.image = _swap_chain_images.images[i],
+			.viewType = VK_IMAGE_VIEW_TYPE_2D,
+			.format = _color_buffer_format,
+			.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+			.subresourceRange.baseMipLevel = 0,
+			.subresourceRange.levelCount = 1,
+			.subresourceRange.baseArrayLayer = 0,
+			.subresourceRange.layerCount = 1,
+		};
+
+		if (vkCreateImageView(_device, &view_info, NULL, _swap_chain_image_views.image_views + i) != VK_SUCCESS)
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+static bool _pick_depth_buffer_format()
+{
+	VkFormat suitable_formats[3] = {
+		VK_FORMAT_D32_SFLOAT,
+		VK_FORMAT_D32_SFLOAT_S8_UINT,
+		VK_FORMAT_D24_UNORM_S8_UINT,
+	};
+
+	VkFormatProperties props;
+
+	for (uint i = 0; i < 3; i += 1)
+	{
+		vkGetPhysicalDeviceFormatProperties(_physical_device, suitable_formats[i], &props);
+
+		if ((props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) == VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)
+		{
+			_depth_buffer_format = suitable_formats[i];
+
+			return true;
+		}
+	}
+
+	return false;
+}
+static bool _create_render_pass()
+{
+	VkAttachmentDescription color_attachment = {
+		.format = _color_buffer_format,
+		.samples = VK_SAMPLE_COUNT_1_BIT,
+		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+		.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+		.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+	};
+
+	VkAttachmentReference color_attachment_ref = {
+		.attachment = 0,
+		.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+	};
+
+	if (!_pick_depth_buffer_format())
+	{
+		return false;
+	}
+
+	VkAttachmentDescription depth_attachment = {
+		.format = _depth_buffer_format,
+		.samples = VK_SAMPLE_COUNT_1_BIT,
+		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+		.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+		.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+		.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+		.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+	};
+
+	VkAttachmentReference depth_attachment_ref = {
+		.attachment = 1,
+		.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+	};
+
+	VkSubpassDescription subPass = {
+		.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+		.colorAttachmentCount = 1,
+		.pColorAttachments = &color_attachment_ref,
+		.pDepthStencilAttachment = &depth_attachment_ref,
+	};
+
+	VkSubpassDependency dependency = {
+		.srcSubpass = VK_SUBPASS_EXTERNAL,
+		.dstSubpass = 0,
+		.srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+		.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT,
+		.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+	};
+
+	VkAttachmentDescription attachments[2] = { color_attachment, depth_attachment };
+
+	VkRenderPassCreateInfo render_pass_info = {
+		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+		.attachmentCount = 2,
+		.pAttachments = attachments,
+		.subpassCount = 1,
+		.pSubpasses = &subPass,
+		.dependencyCount = 1,
+		.pDependencies = &dependency,
+	};
+
+	if (vkCreateRenderPass(_device, &render_pass_info, NULL, &_render_pass) != VK_SUCCESS) {
+		return false;
+	}
+
+	return true;
+}
+static bool _create_descriptor_set_layout()
+{
+	VkDescriptorSetLayoutBinding ubo_layout_binding = {
+		.binding = 0,
+		.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+		.descriptorCount = 1,
+		.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+	};
+
+	VkDescriptorSetLayoutBinding sampler_layout_binding = {
+		.binding = 1,
+		.descriptorCount = 1,
+		.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+		.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+	};
+
+	VkDescriptorSetLayoutBinding bindings[2] = { ubo_layout_binding, sampler_layout_binding };
+	VkDescriptorSetLayoutCreateInfo layout_info = {
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+		.bindingCount = 2,
+		.pBindings = bindings,
+	};
+
+	if (vkCreateDescriptorSetLayout(_device, &layout_info, NULL, &_descriptor_set_layout) != VK_SUCCESS) {
+		return false;
+	}
 
 	return true;
 }
@@ -591,7 +733,12 @@ bool setup_window_and_gpu()
 
 	if (_create_swap_chain())
 	{
-		_set_swap_chain_image_views();
+		if (!_create_swap_chain_image_views())
+		{
+			printf("Failed to create image views.");
+
+			return false;
+		}
 	}
 	else
 	{
@@ -600,22 +747,28 @@ bool setup_window_and_gpu()
 		return false;
 	}
 
-	return true;
-}
+	if (!_create_render_pass())
+	{
+		printf("Failed to create render pass.");
 
-static void _clear_debug_callback()
-{
-	PFN_vkDestroyDebugReportCallbackEXT func = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(
-		_instance, "vkDestroyDebugReportCallbackEXT"
-	);
-
-	if (func != NULL) {
-		func(_instance, _debug_callback_object, NULL);
+		return false;
 	}
+
+	if (!_create_descriptor_set_layout())
+	{
+		printf("Failed to create descriptor set layout.");
+
+		return false;
+	}
+
+	return true;
 }
 
 void destroy_window_and_free_gpu()
 {
+	vkDestroyDescriptorSetLayout(_device, _descriptor_set_layout, NULL);
+	vkDestroyRenderPass(_device, _render_pass, NULL);
+
 	for (uint i = 0; i < _swap_chain_image_views.image_views_num; i += 1)
 	{
 		vkDestroyImageView(_device, _swap_chain_image_views.image_views[i], NULL);
@@ -632,7 +785,13 @@ void destroy_window_and_free_gpu()
 
 	vkDestroySurfaceKHR(_instance, _surface, NULL);
 
-	_clear_debug_callback();
+	PFN_vkDestroyDebugReportCallbackEXT func = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(
+		_instance, "vkDestroyDebugReportCallbackEXT"
+	);
+
+	if (func != NULL) {
+		func(_instance, _debug_callback_object, NULL);
+	}
 
 	vkDestroyInstance(_instance, NULL);
 }
