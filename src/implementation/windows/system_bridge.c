@@ -40,6 +40,9 @@ static VkFormat _depth_buffer_format;
 static VkExtent2D _extent;
 static VkRenderPass _render_pass;
 static VkDescriptorSetLayout _descriptor_set_layout;
+static VkShaderModule _vertex_shader;
+static VkShaderModule _fragment_shader;
+static VkPipeline _graphics_pipeline;
 
 static inline bool _is_complete(const PhysicalDeviceQueueFamilies *indicies) {
 	return indicies->graphics_family_idx >= 0 && indicies->present_family_idx >= 0;
@@ -276,7 +279,32 @@ static bool _physical_device_suitable(const VkPhysicalDevice* physical_device) {
 		_use_same_family(&_physical_device_queue_families) &&
 		extensions_supported &&
 		swap_chain_supported
-		);
+	);
+}
+static bool _create_shader_module(VkShaderModule *shader_module, const char bin_shader_file_path[]) {
+	FILE *file_descriptor = fopen(bin_shader_file_path, "rb");
+
+	if (!file_descriptor)
+	{
+		return false;
+	}
+
+	fseek(file_descriptor, 0L, SEEK_END);
+	uint code_size = ftell(file_descriptor);
+
+	rewind(file_descriptor);
+
+	char *shader_code = malloc(code_size);
+
+	fread(shader_code, code_size, 1, file_descriptor);
+
+	VkShaderModuleCreateInfo create_info = {
+		.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+		.codeSize = code_size,
+		.pCode = (const uint32_t *)shader_code,
+	};
+
+	return vkCreateShaderModule(_device, &create_info, NULL, shader_module) == VK_SUCCESS;
 }
 
 static void _pick_swap_chain_surface_format(VkSurfaceFormatKHR *picked_surface_format) {
@@ -622,11 +650,7 @@ static bool _create_render_pass()
 		.pDependencies = &dependency,
 	};
 
-	if (vkCreateRenderPass(_device, &render_pass_info, NULL, &_render_pass) != VK_SUCCESS) {
-		return false;
-	}
-
-	return true;
+	return vkCreateRenderPass(_device, &render_pass_info, NULL, &_render_pass) == VK_SUCCESS;
 }
 static bool _create_descriptor_set_layout()
 {
@@ -651,7 +675,16 @@ static bool _create_descriptor_set_layout()
 		.pBindings = bindings,
 	};
 
-	if (vkCreateDescriptorSetLayout(_device, &layout_info, NULL, &_descriptor_set_layout) != VK_SUCCESS) {
+	return vkCreateDescriptorSetLayout(_device, &layout_info, NULL, &_descriptor_set_layout) == VK_SUCCESS;
+}
+static bool _create_graphics_pipeline()
+{
+	if (!_create_shader_module(&_vertex_shader, "../../src/shaders/vert.spv"))
+	{
+		return false;
+	}
+	if (!_create_shader_module(&_fragment_shader, "../../src/shaders/frag.spv"))
+	{
 		return false;
 	}
 
@@ -761,11 +794,21 @@ bool setup_window_and_gpu()
 		return false;
 	}
 
+	if (!_create_graphics_pipeline())
+	{
+		printf("Failed to create graphics pipeline.");
+
+		return false;
+	}
+
 	return true;
 }
 
 void destroy_window_and_free_gpu()
 {
+	vkDestroyShaderModule(_device, _vertex_shader, NULL);
+	vkDestroyShaderModule(_device, _fragment_shader, NULL);
+	vkDestroyPipeline(_device, _graphics_pipeline, NULL);
 	vkDestroyDescriptorSetLayout(_device, _descriptor_set_layout, NULL);
 	vkDestroyRenderPass(_device, _render_pass, NULL);
 
