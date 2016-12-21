@@ -64,5 +64,12 @@ typedef struct SwapChainImageViews
 
 } SwapChainImageViews;
 
+typedef struct SwapChainFramebuffers
+{
+	VkFramebuffer *fbs;
+	uint fbs_num;
+
+} SwapChainFramebuffers;
+
 bool setup_window_and_gpu();
 void destroy_window_and_free_gpu();

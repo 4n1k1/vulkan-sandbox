@@ -39,6 +39,9 @@ static VkQueue _present_queue;
 static VkSwapchainKHR _swap_chain;
 static SwapChainImages _swap_chain_images;
 static SwapChainImageViews _swap_chain_image_views;
+static VkImage _depth_image;
+static VkImageView _depth_image_view;
+static VkDeviceMemory _depth_image_memory;
 static VkFormat _color_buffer_format;
 static VkFormat _depth_buffer_format;
 static VkExtent2D _extent;
@@ -48,6 +51,7 @@ static VkShaderModule _vertex_shader;
 static VkShaderModule _fragment_shader;
 static VkPipelineLayout _graphics_pipeline_layout;
 static VkPipeline _graphics_pipeline;
+static SwapChainFramebuffers _swap_chain_framebuffers;
 
 static inline bool _is_complete(const PhysicalDeviceQueueFamilies *indicies) {
 	return indicies->graphics_family_idx >= 0 && indicies->present_family_idx >= 0;
@@ -610,6 +614,24 @@ static bool _pick_depth_buffer_format()
 
 	return false;
 }
+static bool _find_memory_type(uint32_t typeFilter, VkMemoryPropertyFlags properties, uint32_t *memory_type) {
+	VkPhysicalDeviceMemoryProperties memProperties;
+	vkGetPhysicalDeviceMemoryProperties(_physical_device, &memProperties);
+
+	for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+		if (
+			typeFilter & (1 << i) &&
+			(memProperties.memoryTypes[i].propertyFlags & properties) == properties
+		) {
+			*memory_type = i;
+
+			return true;
+		}
+	}
+
+	return false;
+}
+
 static bool _create_render_pass()
 {
 	VkAttachmentDescription color_attachment = {
@@ -904,6 +926,107 @@ static bool _create_graphics_pipeline()
 
 	return vkCreateGraphicsPipelines(_device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &_graphics_pipeline) != VK_SUCCESS;
 }
+static bool _create_framebuffers() {
+	_swap_chain_framebuffers.fbs_num = _swap_chain_image_views.image_views_num;
+	_swap_chain_framebuffers.fbs = malloc(sizeof(SwapChainFramebuffers) * _swap_chain_framebuffers.fbs_num);
+
+	for (uint i = 0; i < _swap_chain_framebuffers.fbs_num; i++) {
+		VkImageView attachments[2] = {
+			_swap_chain_image_views.image_views[i],
+			_depth_image_view
+		};
+
+		VkFramebufferCreateInfo framebufferInfo = {
+			.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+			.renderPass = _render_pass,
+			.attachmentCount = 2,
+			.pAttachments = attachments,
+			.width = _extent.width,
+			.height = _extent.height,
+			.layers = 1,
+		};
+
+		if (vkCreateFramebuffer(_device, &framebufferInfo, NULL, _swap_chain_framebuffers.fbs + i) != VK_SUCCESS)
+		{
+			return false;
+		}
+	}
+
+	return true;
+}
+static bool _create_depth_resources()
+{
+	VkImageCreateInfo imageInfo = {
+		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+		.imageType = VK_IMAGE_TYPE_2D,
+		.extent.width = _extent.width,
+		.extent.height = _extent.height,
+		.extent.depth = 1,
+		.mipLevels = 1,
+		.arrayLayers = 1,
+		.format = _depth_buffer_format,
+		.tiling = VK_IMAGE_TILING_OPTIMAL,
+		.initialLayout = VK_IMAGE_LAYOUT_PREINITIALIZED,
+		.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+		.samples = VK_SAMPLE_COUNT_1_BIT,
+		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+	};
+
+	if (vkCreateImage(_device, &imageInfo, NULL, &_depth_image) != VK_SUCCESS)
+	{
+		return false;
+	}
+
+	VkMemoryRequirements memRequirements;
+	vkGetImageMemoryRequirements(_device, _depth_image, &memRequirements);
+
+	VkMemoryAllocateInfo allocInfo = {
+		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+		.allocationSize = memRequirements.size,
+	};
+
+	if (!_find_memory_type(
+		memRequirements.memoryTypeBits,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		&(allocInfo.memoryTypeIndex))
+	) {
+		return false;
+	}
+
+	if (vkAllocateMemory(_device, &allocInfo, NULL, &_depth_image_memory) != VK_SUCCESS)
+	{
+		return false;
+	}
+
+	vkBindImageMemory(_device, _depth_image, _depth_image_memory, 0);
+
+	VkImageViewCreateInfo view_info = {
+		.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+		.image = _depth_image,
+		.viewType = VK_IMAGE_VIEW_TYPE_2D,
+		.format = _depth_buffer_format,
+		.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+		.subresourceRange.baseMipLevel = 0,
+		.subresourceRange.levelCount = 1,
+		.subresourceRange.baseArrayLayer = 0,
+		.subresourceRange.layerCount = 1,
+	};
+
+	if (vkCreateImageView(_device, &view_info, NULL, &_depth_image_view) != VK_SUCCESS)
+	{
+		return false;
+	}
+
+	this->_transitionImageLayout(
+		this->_depthImage,
+		depthFormat,
+		VK_IMAGE_LAYOUT_UNDEFINED,
+		VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+	);
+
+	return true;
+}
+
 
 bool setup_window_and_gpu()
 {
@@ -1015,11 +1138,30 @@ bool setup_window_and_gpu()
 		return false;
 	}
 
+	if (!_create_depth_resources())
+	{
+		printf("Failed to create depth resources.");
+	}
+
+	if (!_create_framebuffers())
+	{
+		printf("Failed to create swap chain framebuffers.");
+
+		return false;
+	}
+
 	return true;
 }
 
 void destroy_window_and_free_gpu()
 {
+	for (uint i = 0; i < _swap_chain_framebuffers.fbs_num; i += 1)
+	{
+		vkDestroyFramebuffer(_device, _swap_chain_framebuffers.fbs[i], NULL);
+	}
+
+	free(_swap_chain_framebuffers.fbs);
+
 	vkDestroyShaderModule(_device, _vertex_shader, NULL);
 	vkDestroyShaderModule(_device, _fragment_shader, NULL);
 	vkDestroyPipeline(_device, _graphics_pipeline, NULL);
@@ -1031,6 +1173,7 @@ void destroy_window_and_free_gpu()
 	{
 		vkDestroyImageView(_device, _swap_chain_image_views.image_views[i], NULL);
 	}
+
 	free(_swap_chain_image_views.image_views);
 	free(_swap_chain_images.images);
 

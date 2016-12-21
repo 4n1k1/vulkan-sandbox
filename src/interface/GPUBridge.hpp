@@ -166,6 +166,7 @@ class GPUBridge {
 		this->_createCommandPool();
 		this->_createDepthResources();
 		this->_createFramebuffers();
+
 		this->_createTextureImage();
 		this->_createTextureImageView();
 		this->_createTextureSampler();
