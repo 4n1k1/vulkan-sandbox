@@ -27,6 +27,7 @@ typedef struct ExtensionsToEnable
 typedef struct PhysicalDeviceQueueFamilies
 {
 	int graphics_family_idx;
+	int compute_family_idx;
 	int present_family_idx;
 
 } PhysicalDeviceQueueFamilies;

@@ -185,6 +185,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\interface\memory_pool.h" />
+    <ClInclude Include="..\..\src\interface\particle.h" />
     <ClInclude Include="..\..\src\interface\system_bridge.h" />
     <ClInclude Include="..\..\src\interface\z_game.h" />
   </ItemGroup>

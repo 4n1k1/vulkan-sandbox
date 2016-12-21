@@ -21,6 +21,9 @@
     <ClInclude Include="..\..\src\interface\z_game.h">
       <Filter>interface</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\interface\particle.h">
+      <Filter>interface</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="shaders">

@@ -7,6 +7,7 @@
 #include <stdbool.h>
 
 #include "z_game.h"
+#include "particle.h"
 #include "system_bridge.h"
 
 #ifdef NDEBUG
@@ -14,6 +15,8 @@ const bool _enable_validation_layers = false;
 #else
 const bool _enable_validation_layers = true;
 #endif
+
+#define DEVICE_QUEUES_NUM 3
 
 static uint _WINDOW_WIDTH = 800;
 static uint _WINDOW_HEIGHT = 600;
@@ -31,6 +34,7 @@ static PhysicalDeviceQueueFamilies _physical_device_queue_families;
 static PhysicalDeviceSwapChainSupport _physical_device_swap_chain_support;
 static VkDevice _device;
 static VkQueue _graphics_queue;
+static VkQueue _compute_queue;
 static VkQueue _present_queue;
 static VkSwapchainKHR _swap_chain;
 static SwapChainImages _swap_chain_images;
@@ -42,13 +46,17 @@ static VkRenderPass _render_pass;
 static VkDescriptorSetLayout _descriptor_set_layout;
 static VkShaderModule _vertex_shader;
 static VkShaderModule _fragment_shader;
+static VkPipelineLayout _graphics_pipeline_layout;
 static VkPipeline _graphics_pipeline;
 
 static inline bool _is_complete(const PhysicalDeviceQueueFamilies *indicies) {
 	return indicies->graphics_family_idx >= 0 && indicies->present_family_idx >= 0;
 }
 static inline bool _use_same_family(const PhysicalDeviceQueueFamilies *indicies) {
-	return indicies->graphics_family_idx == indicies->present_family_idx;
+	return (
+		indicies->graphics_family_idx == indicies->present_family_idx &&
+		indicies->graphics_family_idx == indicies->compute_family_idx
+	);
 }
 
 static void _on_window_resize(GLFWwindow* window, int width, int height)
@@ -106,38 +114,6 @@ static void _set_extensions_to_enable()
 	_instance_extensions_to_enable.extension_names[extension_to_enable_idx] = VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
 
 	_instance_extensions_to_enable.exts_num = extensions_num;
-}
-static void _set_queue_family_properties(const VkPhysicalDevice *physical_device)
-{
-	uint32_t queue_families_num = 0;
-	vkGetPhysicalDeviceQueueFamilyProperties(*physical_device, &queue_families_num, NULL);
-
-	VkQueueFamilyProperties *queue_families = malloc(sizeof(VkQueueFamilyProperties) * queue_families_num);
-	vkGetPhysicalDeviceQueueFamilyProperties(*physical_device, &queue_families_num, queue_families);
-
-	for (uint i = 0; i < queue_families_num; i += 1)
-	{
-		if ((queue_families + i)->queueCount > 0 && (queue_families + i)->queueFlags & VK_QUEUE_GRAPHICS_BIT)
-		{
-			_physical_device_queue_families.graphics_family_idx = i;
-		}
-
-		VkBool32 presentSupport;
-
-		vkGetPhysicalDeviceSurfaceSupportKHR(*physical_device, i, _surface, &presentSupport);
-
-		if ((queue_families + i)->queueCount > 0 && presentSupport)
-		{
-			_physical_device_queue_families.present_family_idx = i;
-		}
-
-		if (_is_complete(&_physical_device_queue_families))
-		{
-			break;
-		}
-	}
-
-	free(queue_families);
 }
 static void _set_swap_chain_support(const VkPhysicalDevice *physical_device) {
 	PhysicalDeviceSwapChainSupport *alias = &_physical_device_swap_chain_support;
@@ -254,11 +230,61 @@ static bool _physical_device_supports_required_extensions(const VkPhysicalDevice
 
 	return result;
 }
+static bool _set_queue_family_properties(const VkPhysicalDevice *physical_device)
+{
+	uint32_t queue_families_num = 0;
+	vkGetPhysicalDeviceQueueFamilyProperties(*physical_device, &queue_families_num, NULL);
+
+	VkQueueFamilyProperties *queue_families = malloc(sizeof(VkQueueFamilyProperties) * queue_families_num);
+	vkGetPhysicalDeviceQueueFamilyProperties(*physical_device, &queue_families_num, queue_families);
+
+	bool result = false;
+
+	for (uint i = 0; i < queue_families_num; i += 1)
+	{
+		if (
+			(queue_families + i)->queueCount > 0 &&
+			(queue_families + i)->queueFlags & VK_QUEUE_GRAPHICS_BIT
+			) {
+			_physical_device_queue_families.graphics_family_idx = i;
+		}
+
+		if (
+			(queue_families + i)->queueCount > 0 &&
+			(queue_families + i)->queueFlags & VK_QUEUE_COMPUTE_BIT
+			) {
+			_physical_device_queue_families.compute_family_idx = i;
+		}
+
+		VkBool32 present_support;
+
+		vkGetPhysicalDeviceSurfaceSupportKHR(*physical_device, i, _surface, &present_support);
+
+		if ((queue_families + i)->queueCount > 0 && present_support)
+		{
+			_physical_device_queue_families.present_family_idx = i;
+		}
+
+		if (_is_complete(&_physical_device_queue_families))
+		{
+			result = true;
+
+			break;
+		}
+	}
+
+	free(queue_families);
+
+	return result;
+}
 static bool _physical_device_suitable(const VkPhysicalDevice* physical_device) {
 	VkPhysicalDeviceProperties device_properties;
 	vkGetPhysicalDeviceProperties(*physical_device, &device_properties);
 
-	_set_queue_family_properties(physical_device);
+	if (!_set_queue_family_properties(physical_device))
+	{
+		return false;
+	}
 
 	bool extensions_supported = _physical_device_supports_required_extensions(physical_device);
 
@@ -270,7 +296,7 @@ static bool _physical_device_suitable(const VkPhysicalDevice* physical_device) {
 		swap_chain_supported = (
 			_physical_device_swap_chain_support.formats_num != 0 &&
 			_physical_device_swap_chain_support.present_modes_num != 0
-			);
+		);
 	}
 
 	return (
@@ -445,13 +471,13 @@ static bool _pick_physical_device() {
 };
 static bool _create_logical_device()
 {
-	float queuePriority = 1.0f;
+	float queuePriorities[DEVICE_QUEUES_NUM] = { 1.0f, 0.5f, 0.0f };
 
 	VkDeviceQueueCreateInfo queue_create_info = {
 		.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-		.queueFamilyIndex = _physical_device_queue_families.graphics_family_idx,
-		.queueCount = 1,
-		.pQueuePriorities = &queuePriority,
+		.queueFamilyIndex = _physical_device_queue_families.graphics_family_idx,  // all queues in this family
+		.queueCount = DEVICE_QUEUES_NUM,
+		.pQueuePriorities = queuePriorities,
 	};
 
 	VkPhysicalDeviceFeatures device_features;
@@ -483,8 +509,9 @@ static bool _create_logical_device()
 		return false;
 	}
 
-	vkGetDeviceQueue(_device, _physical_device_queue_families.graphics_family_idx, 0, &_graphics_queue);
-	vkGetDeviceQueue(_device, _physical_device_queue_families.present_family_idx, 0, &_present_queue);
+	vkGetDeviceQueue(_device, _physical_device_queue_families.compute_family_idx, 0, &_compute_queue);
+	vkGetDeviceQueue(_device, _physical_device_queue_families.graphics_family_idx, 1, &_graphics_queue);
+	vkGetDeviceQueue(_device, _physical_device_queue_families.present_family_idx, 2, &_present_queue);
 
 	return true;
 }
@@ -688,7 +715,194 @@ static bool _create_graphics_pipeline()
 		return false;
 	}
 
-	return true;
+	VkPipelineShaderStageCreateInfo vertex_shader_stage_ci = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+		.stage = VK_SHADER_STAGE_VERTEX_BIT,
+		.module = _vertex_shader,
+		.pName = "main",
+	};
+
+	VkPipelineShaderStageCreateInfo fragment_shader_stage_ci = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+		.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+		.module = _fragment_shader,
+		.pName = "main",
+	};
+
+	VkPipelineShaderStageCreateInfo shaderStages[2] = {
+		vertex_shader_stage_ci,
+		fragment_shader_stage_ci,
+	};
+
+	VkVertexInputBindingDescription binding_description = {
+		.binding = 0,
+		.stride = sizeof(Particle),
+		.inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+	};
+
+	VkVertexInputAttributeDescription attribute_descriptions[2];
+
+	attribute_descriptions[0].binding = 0;
+	attribute_descriptions[0].location = 0;
+	attribute_descriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+	attribute_descriptions[0].offset = 0;
+
+	attribute_descriptions[1].binding = 0;
+	attribute_descriptions[1].location = 1;
+	attribute_descriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+	attribute_descriptions[1].offset = sizeof(float) * 3;
+
+	VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+		.vertexBindingDescriptionCount = 1,
+		.vertexAttributeDescriptionCount = 2,
+		.pVertexBindingDescriptions = &binding_description,
+		.pVertexAttributeDescriptions = attribute_descriptions,
+	};
+
+	VkPipelineInputAssemblyStateCreateInfo input_assembly = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+		.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+		.primitiveRestartEnable = VK_FALSE,
+	};
+
+	VkPipelineDepthStencilStateCreateInfo depthStencil = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+		.depthTestEnable = VK_TRUE,
+		.depthWriteEnable = VK_TRUE,
+		.depthCompareOp = VK_COMPARE_OP_LESS,
+		.depthBoundsTestEnable = VK_FALSE,
+		.minDepthBounds = 0.0f, // Optional
+		.maxDepthBounds = 1.0f, // Optional
+		.stencilTestEnable = VK_FALSE,
+	};
+
+	VkViewport viewport = {
+		.x = 0.0f,
+		.y = 0.0f,
+		.width = (float)(_extent.width),
+		.height = (float)(_extent.height),
+		.minDepth = 0.0f,
+		.maxDepth = 1.0f,
+	};
+
+	VkOffset2D offset = {
+		.x = 0,
+		.y = 0,
+	};
+
+	VkRect2D scissor = {
+		.offset = offset,
+		.extent = _extent,
+	};
+
+	VkPipelineViewportStateCreateInfo viewportState = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+		.viewportCount = 1,
+		.pViewports = &viewport,
+		.scissorCount = 1,
+		.pScissors = &scissor,
+	};
+
+	VkPipelineRasterizationStateCreateInfo rasterizer = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+		.depthClampEnable = VK_FALSE, // VK_TRUE for shadow maps requires enabling GPU feature
+		.rasterizerDiscardEnable = VK_FALSE,
+		.polygonMode = VK_POLYGON_MODE_FILL, // VK_POLYGON_MODE_LINE or VK_POLYGON_MODE_POINT
+		.cullMode = VK_CULL_MODE_BACK_BIT,
+		.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+		.lineWidth = 1.0f,
+		.depthBiasEnable = VK_FALSE,
+		.depthBiasConstantFactor = 0.0f, // Optional
+		.depthBiasClamp = 0.0f, // Optional
+		.depthBiasSlopeFactor = 0.0f, // Optional
+	};
+
+	VkPipelineMultisampleStateCreateInfo multisampling = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+		.sampleShadingEnable = VK_FALSE,
+		.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+		.minSampleShading = 1.0f, // Optional
+		.pSampleMask = NULL, // Optional
+		.alphaToCoverageEnable = VK_FALSE, // Optional
+		.alphaToOneEnable = VK_FALSE, // Optional
+	};
+
+	VkPipelineColorBlendAttachmentState colorBlendAttachment = {
+		.colorWriteMask = (
+			VK_COLOR_COMPONENT_R_BIT |
+			VK_COLOR_COMPONENT_G_BIT |
+			VK_COLOR_COMPONENT_B_BIT |
+			VK_COLOR_COMPONENT_A_BIT
+		),
+		.blendEnable = VK_TRUE,
+		.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+		.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+		.colorBlendOp = VK_BLEND_OP_ADD,
+		.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+		.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+		.alphaBlendOp = VK_BLEND_OP_ADD,
+	};
+
+	VkPipelineColorBlendStateCreateInfo colorBlending = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+		.logicOpEnable = VK_FALSE,
+		.logicOp = VK_LOGIC_OP_COPY, // Optional
+		.attachmentCount = 1,
+		.pAttachments = &colorBlendAttachment,
+		.blendConstants[0] = 0.0f, // Optional
+		.blendConstants[1] = 0.0f, // Optional
+		.blendConstants[2] = 0.0f, // Optional
+		.blendConstants[3] = 0.0f, // Optional
+	};
+
+	VkDynamicState dynamicStates[] = {
+		VK_DYNAMIC_STATE_VIEWPORT,
+		VK_DYNAMIC_STATE_LINE_WIDTH
+	};
+
+	VkPipelineDynamicStateCreateInfo dynamicState = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+		.dynamicStateCount = 2,
+		.pDynamicStates = dynamicStates,
+	};
+
+	VkDescriptorSetLayout setLayouts[] = { _descriptor_set_layout };
+
+	VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+		.setLayoutCount = 1,
+		.pSetLayouts = setLayouts,
+		.pushConstantRangeCount = 0, // Optional
+		.pPushConstantRanges = 0, // Optional
+	};
+
+	if (vkCreatePipelineLayout(_device, &pipelineLayoutInfo, NULL, &_graphics_pipeline_layout) != VK_SUCCESS)
+	{
+		return false;
+	}
+
+	VkGraphicsPipelineCreateInfo pipelineInfo = {
+		.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+		.stageCount = 2,
+		.pStages = shaderStages,
+		.pVertexInputState = &vertexInputInfo,
+		.pInputAssemblyState = &input_assembly,
+		.pViewportState = &viewportState,
+		.pRasterizationState = &rasterizer,
+		.pMultisampleState = &multisampling,
+		.pDepthStencilState = NULL, // Optional
+		.pColorBlendState = &colorBlending,
+		.pDynamicState = NULL, // Optional
+		.layout = _graphics_pipeline_layout,
+		.renderPass = _render_pass,
+		.subpass = 0,
+		.basePipelineHandle = VK_NULL_HANDLE,
+		.basePipelineIndex = -1, // Optional
+		.pDepthStencilState = &depthStencil,
+	};
+
+	return vkCreateGraphicsPipelines(_device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &_graphics_pipeline) != VK_SUCCESS;
 }
 
 bool setup_window_and_gpu()
@@ -809,6 +1023,7 @@ void destroy_window_and_free_gpu()
 	vkDestroyShaderModule(_device, _vertex_shader, NULL);
 	vkDestroyShaderModule(_device, _fragment_shader, NULL);
 	vkDestroyPipeline(_device, _graphics_pipeline, NULL);
+	vkDestroyPipelineLayout(_device, _graphics_pipeline_layout, NULL);
 	vkDestroyDescriptorSetLayout(_device, _descriptor_set_layout, NULL);
 	vkDestroyRenderPass(_device, _render_pass, NULL);
 
