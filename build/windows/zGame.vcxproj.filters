@@ -18,10 +18,7 @@
     <ClInclude Include="..\..\src\interface\memory_pool.h">
       <Filter>interface</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\interface\z_game.h">
-      <Filter>interface</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\interface\particle.h">
+    <ClInclude Include="..\..\src\interface\math3d.h">
       <Filter>interface</Filter>
     </ClInclude>
   </ItemGroup>
@@ -40,10 +37,13 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\src\shaders\shader.frag">
+    <None Include="..\..\src\shaders\fragment">
       <Filter>shaders</Filter>
     </None>
-    <None Include="..\..\src\shaders\shader.vert">
+    <None Include="..\..\src\shaders\vertex">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\..\src\shaders\compute">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>

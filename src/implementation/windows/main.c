@@ -9,6 +9,12 @@ int main(int argc, char** argv) {
 		return EXIT_FAILURE;
 	}
 
+	create_particles();
+
+	render();
+
+	destroy_particles();
+
 	destroy_window_and_free_gpu();
 
 	return EXIT_SUCCESS;

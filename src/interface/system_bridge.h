@@ -1,75 +1,163 @@
-#include "z_game.h"
-
 #include <stdbool.h>
-#include <vulkan/vulkan.h>
+
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
 
 typedef struct RequiredValidationLayers
 {
-	char *layer_names[1];
-	uint layers_num;
+	char *names[1];
+	size_t count;
 
 } RequiredValidationLayers;
 
 typedef struct RequiredGLFWExtensions
 {
-	const char **extension_names;
-	uint exts_num;
+	const char **names;
+	size_t count;
 
 } RequiredGLFWExtensions;
 
 typedef struct ExtensionsToEnable
 {
-	char const **extension_names;
-	uint exts_num;
+	char const **names;
+	size_t count;
 
 } ExtensionsToEnable;
 
-typedef struct PhysicalDeviceQueueFamilies
+typedef struct OperationQueueFamilies
 {
 	int graphics_family_idx;
 	int compute_family_idx;
 	int present_family_idx;
 
-} PhysicalDeviceQueueFamilies;
+	bool use_same_family;
 
-typedef struct PhysicalDeviceSwapChainSupport
+} OperationQueueFamilies;
+
+typedef struct SurfaceFormats
 {
-	VkSurfaceCapabilitiesKHR capabilities;
-	VkSurfaceFormatKHR *formats;
-	uint formats_num;
+	VkSurfaceFormatKHR *data;
+	size_t count;
 
-	VkPresentModeKHR *present_modes;
-	uint present_modes_num;
+} SurfaceFormats;
 
-} PhysicalDeviceSwapChainSupport;
+typedef struct PresentModes
+{
+	VkPresentModeKHR *data;
+	size_t count;
+
+} PresentModes;
 
 typedef struct RequiredPhysicalDeviceExtensions
 {
-	char *extension_names[1];
-	uint exts_num;
+	char *names[1];
+	size_t count;
 
 } RequiredPhysicalDeviceExtensions;
 
 typedef struct SwapChainImages
 {
-	VkImage *images;
-	uint images_num;
+	VkImage *data;
+	size_t count;
 
 } SwapChainImages;
 
 typedef struct SwapChainImageViews
 {
-	VkImageView *image_views;
-	uint image_views_num;
+	VkImageView *data;
+	size_t count;
 
 } SwapChainImageViews;
 
 typedef struct SwapChainFramebuffers
 {
-	VkFramebuffer *fbs;
-	uint fbs_num;
+	VkFramebuffer *data;
+	size_t count;
 
 } SwapChainFramebuffers;
 
+typedef struct CommandBuffers
+{
+	VkCommandBuffer *data;
+	size_t count;
+
+} CommandBuffers;
+
+typedef struct Color
+{
+	float red;
+	float green;
+	float blue;
+	float alpha;
+
+} Color;
+
+typedef struct Vertex
+{
+	float x;
+	float y;
+	float z;
+
+	Color color;
+
+} Vertex;
+
+typedef struct Vertices
+{
+	Vertex *data;
+	size_t count;
+
+} Vertices;
+
+typedef struct Indices
+{
+	size_t *data;
+
+	size_t count;
+
+} Indices;
+
+typedef struct Position
+{
+	float x;
+	float y;
+	float z;
+
+} Position;
+
+typedef struct Particle
+{
+	Position position;
+
+	size_t color_idx;
+
+} Particle;
+
+typedef struct Matrix
+{
+	float data[4][4];
+
+} Matrix;
+
+typedef struct MVP
+{
+	Matrix model;
+	Matrix view;
+	Matrix projection;
+
+} MVP;
+
+typedef struct UniformData
+{
+	MVP mvp;
+	Color colors[1];
+
+} UniformData;
+
 bool setup_window_and_gpu();
 void destroy_window_and_free_gpu();
+
+void create_particles();
+void destroy_particles();
+
+void render();
