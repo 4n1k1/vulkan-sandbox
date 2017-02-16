@@ -10,6 +10,9 @@
     <ClCompile Include="..\..\src\implementation\windows\main.c">
       <Filter>implementation</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\implementation\windows\math3d.c">
+      <Filter>implementation</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\interface\system_bridge.h">

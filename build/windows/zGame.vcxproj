@@ -180,6 +180,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\implementation\windows\main.c" />
+    <ClCompile Include="..\..\src\implementation\windows\math3d.c" />
     <ClCompile Include="..\..\src\implementation\windows\memory_pool.c" />
     <ClCompile Include="..\..\src\implementation\windows\system_bridge.c" />
   </ItemGroup>

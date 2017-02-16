@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "system_bridge.h"
+#include "math3d.h"
 
 #ifdef NDEBUG
 const bool _enable_validation_layers = false;
@@ -28,14 +29,40 @@ const bool _enable_validation_layers = true;
 
 /* Module state */
 
-static const size_t _DEFAULT_WINDOW_WIDTH = 800;
-static const size_t _DEFAULT_WINDOW_HEIGHT = 600;
+static const uint32_t _DEFAULT_WINDOW_WIDTH = 800;
+static const uint32_t _DEFAULT_WINDOW_HEIGHT = 600;
+
+static const float _vertical_fov = 50.0f;
+static const float _display_aspect_ratio = 16.0f / 9.0f;
+
+static const Vector_3 _look_at = { .x = 0.0f, .y = 0.0f, .z = 1.0f };  // look at vector
+static const Vector_3 _eye = { .x = 0.0f, .y = 0.0f, .z = 0.0f };      // eye position
+static const Vector_3 _up = { .x = 0.0f, .y = 1.0f,.y =  0.0f };       // up vector
+
+static Matrix_4x4 _projection_matrix;
+static Matrix_4x4 _view_matrix;
+
+static RequiredValidationLayers _required_validation_layers = {
+	.names = { "VK_LAYER_LUNARG_standard_validation" },
+	.count = 1,
+};
+
+static RequiredPhysicalDeviceExtensions _required_physical_device_extensions = {
+	.names = { VK_KHR_SWAPCHAIN_EXTENSION_NAME },
+	.count = 1,
+};
+
+static OperationQueueFamilies _operation_queue_families = {
+	.graphics_family_idx = -1,
+	.compute_family_idx = -1,
+	.present_family_idx = -1,
+
+	.use_same_family = false,
+};
 
 static GLFWwindow *_window = NULL;
 static RequiredGLFWExtensions _required_glfw_extensions;
-static RequiredPhysicalDeviceExtensions _required_physical_device_extensions;
 static ExtensionsToEnable _instance_extensions_to_enable;
-static RequiredValidationLayers _required_validation_layers;
 static VkInstance _instance;
 static VkDebugReportCallbackEXT _debug_callback_object;
 static VkSurfaceKHR _surface;
@@ -43,7 +70,6 @@ static VkSurfaceCapabilitiesKHR _surface_capabilities;
 static SurfaceFormats _surface_formats;
 static PresentModes _present_modes;
 static VkPhysicalDevice _physical_device = VK_NULL_HANDLE;
-static OperationQueueFamilies _operation_queue_families;
 static VkDevice _device;
 static VkQueue _graphics_queue;
 static VkQueue _compute_queue;
@@ -52,13 +78,13 @@ static VkRenderPass _render_pass;
 static VkCommandPool _command_pool;
 static CommandBuffers _command_buffers;
 
-static VkCommandBuffer *_one_time_command_buffer;  // executed in present queue
+static VkCommandBuffer *_one_time_command_buffer;     // executed in present queue
 static VkCommandBuffer *_image_draw_command_buffers;  // executed in graphics queue
-static VkCommandBuffer *_compute_command_buffer;  // executed in compute queue
+static VkCommandBuffer *_compute_command_buffer;      // executed in compute queue
 
-static size_t _one_time_command_buffer_idx;
-static size_t _image_draw_command_buffers_begin_idx;
-static size_t _compute_command_buffer_idx;
+static uint32_t _one_time_command_buffer_idx;
+static uint32_t _image_draw_command_buffers_begin_idx;
+static uint32_t _compute_command_buffer_idx;
 
 static VkSwapchainKHR _swap_chain;
 
@@ -198,40 +224,24 @@ static bool _find_memory_type(uint32_t *memory_type, uint32_t typeFilter, VkMemo
 
 /* Secondary logic */
 
-static VkBool32 __stdcall _debug_callback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t obj, size_t location, int32_t code, const char* layerPrefix, const char* msg, void* userData)
+static VkBool32 __stdcall _debug_callback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t obj, uint32_t location, int32_t code, const char* layerPrefix, const char* msg, void* userData)
 {
 	printf("Validation layer: %s.\n", msg);
 
 	return VK_FALSE;
 }
 
-static void _set_required_validation_layers()
-{
-	_required_validation_layers.names[0] = "VK_LAYER_LUNARG_standard_validation";
-	_required_validation_layers.count = 1;
-}
-static void _set_required_glfw_extensions()
-{
-	_required_glfw_extensions.names = glfwGetRequiredInstanceExtensions(
-		&(_required_glfw_extensions.count)
-	);
-}
-static void _set_required_physical_device_extensions()
-{
-	_required_physical_device_extensions.names[0] = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
-	_required_physical_device_extensions.count = 1;
-}
 static void _set_extensions_to_enable()
 {
-	size_t extensions_num = _required_glfw_extensions.count + 1;
+	uint32_t extensions_num = _required_glfw_extensions.count + 1;
 
 	_instance_extensions_to_enable.names = malloc(
 		sizeof(char **) * extensions_num
 	);
 
-	size_t extension_to_enable_idx = 0;
+	uint32_t extension_to_enable_idx = 0;
 
-	for (size_t i = 0; i < _required_glfw_extensions.count; i += 1)
+	for (uint32_t i = 0; i < _required_glfw_extensions.count; i += 1)
 	{
 		_instance_extensions_to_enable.names[extension_to_enable_idx] = _required_glfw_extensions.names[i];
 		extension_to_enable_idx += 1;
@@ -270,7 +280,7 @@ static void _pick_swap_chain_surface_format(VkSurfaceFormatKHR *picked_surface_f
 		return;
 	}
 
-	for (size_t i = 0; i < _surface_formats.count; i += 1)
+	for (uint32_t i = 0; i < _surface_formats.count; i += 1)
 	{
 		if (
 			_surface_formats.data[i].format == VK_FORMAT_B8G8R8A8_UNORM &&
@@ -285,7 +295,7 @@ static void _pick_swap_chain_surface_format(VkSurfaceFormatKHR *picked_surface_f
 }
 static void _pick_swap_chain_present_mode(VkPresentModeKHR *present_mode)
 {
-	for (size_t i = 0; i < _present_modes.count; i += 1) {
+	for (uint32_t i = 0; i < _present_modes.count; i += 1) {
 		if (_present_modes.data[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
 			*present_mode = _present_modes.data[i];
 		}
@@ -296,7 +306,7 @@ static void _pick_swap_chain_present_mode(VkPresentModeKHR *present_mode)
 
 static bool _instance_supports_required_layers()
 {
-	size_t supported_layers_num;
+	uint32_t supported_layers_num;
 	vkEnumerateInstanceLayerProperties(&supported_layers_num, NULL);
 
 	VkLayerProperties *supported_layers = malloc(sizeof(VkLayerProperties) * supported_layers_num);
@@ -305,10 +315,10 @@ static bool _instance_supports_required_layers()
 
 	bool result = true;
 
-	for (size_t i = 0; i < _required_validation_layers.count; i += 1) {
+	for (uint32_t i = 0; i < _required_validation_layers.count; i += 1) {
 		bool layer_found = false;
 
-		for (size_t j = 0; j < supported_layers_num; j += 1) {
+		for (uint32_t j = 0; j < supported_layers_num; j += 1) {
 			if (strcmp(supported_layers[j].layerName, _required_validation_layers.names[i]) == 0) {
 				layer_found = true;
 				break;
@@ -328,7 +338,7 @@ static bool _instance_supports_required_layers()
 }
 static bool _instance_supports_required_extensions()
 {
-	size_t supported_exts_num = 0;
+	uint32_t supported_exts_num = 0;
 	vkEnumerateInstanceExtensionProperties(NULL, &supported_exts_num, NULL);
 
 	VkExtensionProperties *supported_exts = malloc(sizeof(VkExtensionProperties) * supported_exts_num);
@@ -336,10 +346,10 @@ static bool _instance_supports_required_extensions()
 
 	bool result = true;
 
-	for (size_t i = 0; i < _required_glfw_extensions.count; i += 1) {
+	for (uint32_t i = 0; i < _required_glfw_extensions.count; i += 1) {
 		bool ext_found = false;
 
-		for (size_t j = 0; j < supported_exts_num; j += 1) {
+		for (uint32_t j = 0; j < supported_exts_num; j += 1) {
 			if (strcmp(supported_exts[j].extensionName, _required_glfw_extensions.names[i]) == 0) {
 				ext_found = true;
 				break;
@@ -366,11 +376,11 @@ static bool _physical_device_supports_required_extensions(const VkPhysicalDevice
 
 	vkEnumerateDeviceExtensionProperties(*physical_device, NULL, &supported_exts_num, supported_extensions);
 
-	size_t matches = 0;
+	uint32_t matches = 0;
 
-	for (size_t i = 0; i < _required_physical_device_extensions.count; i += 1)
+	for (uint32_t i = 0; i < _required_physical_device_extensions.count; i += 1)
 	{
-		for (size_t j = 0; j < supported_exts_num; j += 1)
+		for (uint32_t j = 0; j < supported_exts_num; j += 1)
 		{
 			VkExtensionProperties *supported_extension = supported_extensions + j;
 
@@ -397,20 +407,20 @@ static bool _set_queue_family_properties(const VkPhysicalDevice *physical_device
 
 	bool result = false;
 
-	for (size_t i = 0; i < queue_families_num; i += 1)
+	for (uint32_t i = 0; i < queue_families_num; i += 1)
 	{
 		if (
 			queue_families[i].queueCount > 0 &&
 			queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT
 		) {
-			_operation_queue_families.graphics_family_idx = i;
+			_operation_queue_families.graphics_family_idx = (int)i;
 		}
 
 		if (
 			queue_families[i].queueCount > 0 &&
 			queue_families[i].queueFlags & VK_QUEUE_COMPUTE_BIT
 		) {
-			_operation_queue_families.compute_family_idx = i;
+			_operation_queue_families.compute_family_idx = (int)i;
 		}
 
 		VkBool32 present_support;
@@ -419,7 +429,7 @@ static bool _set_queue_family_properties(const VkPhysicalDevice *physical_device
 
 		if (queue_families[i].queueCount > 0 && present_support)
 		{
-			_operation_queue_families.present_family_idx = i;
+			_operation_queue_families.present_family_idx = (int)i;
 		}
 
 		if (
@@ -478,7 +488,7 @@ static bool _create_shader_module(VkShaderModule *shader_module, const char bin_
 	}
 
 	fseek(file_descriptor, 0L, SEEK_END);
-	size_t code_size = ftell(file_descriptor);
+	uint32_t code_size = ftell(file_descriptor);
 
 	rewind(file_descriptor);
 
@@ -560,7 +570,7 @@ static bool _pick_depth_buffer_format()
 
 	VkFormatProperties props;
 
-	for (size_t i = 0; i < 3; i += 1)
+	for (uint32_t i = 0; i < 3; i += 1)
 	{
 		vkGetPhysicalDeviceFormatProperties(_physical_device, suitable_formats[i], &props);
 
@@ -633,7 +643,7 @@ static bool _setup_debug_callback()
 }
 static bool _pick_physical_device()
 {
-	size_t devices_num = 0;
+	uint32_t devices_num = 0;
 
 	vkEnumeratePhysicalDevices(_instance, &devices_num, NULL);
 
@@ -650,7 +660,7 @@ static bool _pick_physical_device()
 	}
 	else
 	{
-		for (size_t i = 0; i < devices_num; i += 1) {
+		for (uint32_t i = 0; i < devices_num; i += 1) {
 			if (_physical_device_suitable(devices + i)) {
 				_physical_device = devices[i];
 
@@ -760,7 +770,7 @@ static bool _create_swap_chain()
 		sizeof(VkImageView) * _swap_chain_image_views.count
 	);
 
-	for (size_t i = 0; i < _swap_chain_images.count; i++)
+	for (uint32_t i = 0; i < _swap_chain_images.count; i++)
 	{
 		if (!_create_image_view(
 			_swap_chain_images.data + i,
@@ -1282,14 +1292,14 @@ static bool _create_vertex_buffer()
 	void* data;
 
 	vkMapMemory(_device, _device_vertex_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, _vertices.data, (size_t)buffer_size);
+	memcpy(data, _vertices.data, (uint32_t)buffer_size);
 	vkUnmapMemory(_device, _device_vertex_buffer_memory);
 
 	return true;
 }
 static bool _create_index_buffer()
 {
-	VkDeviceSize bufferSize = sizeof(size_t) * _indices.count;
+	VkDeviceSize bufferSize = sizeof(uint32_t) * _indices.count;
 
 	if (!_create_memory_buffer(
 		bufferSize,
@@ -1304,7 +1314,7 @@ static bool _create_index_buffer()
 	void* data;
 
 	vkMapMemory(_device, _device_index_buffer_memory, 0, bufferSize, 0, &data);
-	memcpy(data, _indices.data, (size_t)bufferSize);
+	memcpy(data, _indices.data, (uint32_t)bufferSize);
 	vkUnmapMemory(_device, _device_index_buffer_memory);
 
 	return true;
@@ -1314,7 +1324,7 @@ static bool _create_framebuffers()
 	_swap_chain_framebuffers.count = _swap_chain_image_views.count;
 	_swap_chain_framebuffers.data = malloc(sizeof(SwapChainFramebuffers) * _swap_chain_framebuffers.count);
 
-	for (size_t i = 0; i < _swap_chain_framebuffers.count; i++)
+	for (uint32_t i = 0; i < _swap_chain_framebuffers.count; i++)
 	{
 		VkImageView attachments[2] = {
 			_swap_chain_image_views.data[i],
@@ -1369,7 +1379,7 @@ static bool _create_command_pool_and_allocate_buffers()
 }
 static bool _write_image_draw_command_buffers()
 {
-	for (size_t i = _image_draw_command_buffers_begin_idx; i < _command_buffers.count; i++)
+	for (uint32_t i = _image_draw_command_buffers_begin_idx; i < _command_buffers.count; i++)
 	{
 		VkCommandBufferBeginInfo beginInfo = {
 			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -1431,7 +1441,7 @@ static bool _create_semaphores()
 }
 static bool _draw_frame()
 {
-	size_t image_index;
+	uint32_t image_index;
 
 	vkAcquireNextImageKHR(_device, _swap_chain, 1000, _image_available, VK_NULL_HANDLE, &image_index);
 
@@ -1517,9 +1527,10 @@ bool setup_window_and_gpu()
 		return false;
 	}
 
-	_set_required_validation_layers();
-	_set_required_glfw_extensions();
-	_set_required_physical_device_extensions();
+	_required_glfw_extensions.names = glfwGetRequiredInstanceExtensions(
+		&(_required_glfw_extensions.count)
+	);
+
 	_set_extensions_to_enable();
 
 	if (_enable_validation_layers) // to handle VK errors in our function
@@ -1699,6 +1710,9 @@ void create_particles()
 	_particles[7].position.y = 1.0f;
 	_particles[7].position.z = 1.0f;
 	_particles[7].color_idx = 0;
+
+	_projection_matrix = get_perspective_projection_matrix(_vertical_fov, _display_aspect_ratio, 0.1f, 9.0f);
+	_view_matrix = get_view_matrix(_eye, _look_at, _up);
 }
 void destroy_particles()
 {
@@ -1730,7 +1744,7 @@ void destroy_window_and_free_gpu()
 	vkFreeCommandBuffers(_device, _command_pool, _command_buffers.count, _command_buffers.data);
 	vkDestroyCommandPool(_device, _command_pool, NULL);
 
-	for (size_t i = 0; i < _swap_chain_framebuffers.count; i += 1)
+	for (uint32_t i = 0; i < _swap_chain_framebuffers.count; i += 1)
 	{
 		vkDestroyFramebuffer(_device, _swap_chain_framebuffers.data[i], NULL);
 	}
@@ -1746,7 +1760,7 @@ void destroy_window_and_free_gpu()
 	vkDestroyDescriptorSetLayout(_device, _descriptor_set_layout, NULL);
 	vkDestroyRenderPass(_device, _render_pass, NULL);
 
-	for (size_t i = 0; i < _swap_chain_image_views.count; i += 1)
+	for (uint32_t i = 0; i < _swap_chain_image_views.count; i += 1)
 	{
 		vkDestroyImageView(_device, _swap_chain_image_views.data[i], NULL);
 	}

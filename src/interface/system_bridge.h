@@ -1,26 +1,31 @@
+#ifndef ZGAME_SYSTEM_BRIDGE
+#define ZGAME_SYSTEM_BRIDGE
+
 #include <stdbool.h>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
+#include "math3d.h"
+
 typedef struct RequiredValidationLayers
 {
 	char *names[1];
-	size_t count;
+	uint32_t count;
 
 } RequiredValidationLayers;
 
 typedef struct RequiredGLFWExtensions
 {
 	const char **names;
-	size_t count;
+	uint32_t count;
 
 } RequiredGLFWExtensions;
 
 typedef struct ExtensionsToEnable
 {
 	char const **names;
-	size_t count;
+	uint32_t count;
 
 } ExtensionsToEnable;
 
@@ -37,49 +42,49 @@ typedef struct OperationQueueFamilies
 typedef struct SurfaceFormats
 {
 	VkSurfaceFormatKHR *data;
-	size_t count;
+	uint32_t count;
 
 } SurfaceFormats;
 
 typedef struct PresentModes
 {
 	VkPresentModeKHR *data;
-	size_t count;
+	uint32_t count;
 
 } PresentModes;
 
 typedef struct RequiredPhysicalDeviceExtensions
 {
 	char *names[1];
-	size_t count;
+	uint32_t count;
 
 } RequiredPhysicalDeviceExtensions;
 
 typedef struct SwapChainImages
 {
 	VkImage *data;
-	size_t count;
+	uint32_t count;
 
 } SwapChainImages;
 
 typedef struct SwapChainImageViews
 {
 	VkImageView *data;
-	size_t count;
+	uint32_t count;
 
 } SwapChainImageViews;
 
 typedef struct SwapChainFramebuffers
 {
 	VkFramebuffer *data;
-	size_t count;
+	uint32_t count;
 
 } SwapChainFramebuffers;
 
 typedef struct CommandBuffers
 {
 	VkCommandBuffer *data;
-	size_t count;
+	uint32_t count;
 
 } CommandBuffers;
 
@@ -105,45 +110,31 @@ typedef struct Vertex
 typedef struct Vertices
 {
 	Vertex *data;
-	size_t count;
+	uint32_t count;
 
 } Vertices;
 
 typedef struct Indices
 {
-	size_t *data;
+	uint32_t *data;
 
-	size_t count;
+	uint32_t count;
 
 } Indices;
 
-typedef struct Position
-{
-	float x;
-	float y;
-	float z;
-
-} Position;
-
 typedef struct Particle
 {
-	Position position;
+	Vector_3 position;
 
-	size_t color_idx;
+	uint32_t color_idx;
 
 } Particle;
 
-typedef struct Matrix
-{
-	float data[4][4];
-
-} Matrix;
-
 typedef struct MVP
 {
-	Matrix model;
-	Matrix view;
-	Matrix projection;
+	Matrix_4x4 model;
+	Matrix_4x4 view;
+	Matrix_4x4 projection;
 
 } MVP;
 
@@ -161,3 +152,5 @@ void create_particles();
 void destroy_particles();
 
 void render();
+
+#endif
