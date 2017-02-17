@@ -39,8 +39,32 @@ static const Vector_3 _look_at = { .x = 0.0f, .y = 0.0f, .z = 1.0f };  // look a
 static const Vector_3 _eye = { .x = 0.0f, .y = 0.0f, .z = 0.0f };      // eye position
 static const Vector_3 _up = { .x = 0.0f, .y = 1.0f,.y =  0.0f };       // up vector
 
-static Matrix_4x4 _projection_matrix;
-static Matrix_4x4 _view_matrix;
+static Matrix_4x4 _projection = {
+	.data = {
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f
+	}
+};
+
+static Matrix_4x4 _view = {
+	.data = {
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f
+	}
+};
+
+static Matrix_4x4 _model = {
+	.data = {
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, 1.0f
+	}
+};
 
 static RequiredValidationLayers _required_validation_layers = {
 	.names = { "VK_LAYER_LUNARG_standard_validation" },
@@ -1255,8 +1279,9 @@ static bool _create_descriptor_sets()
 }
 static bool _create_uniform_data_buffer()
 {
-	VkDeviceSize bufferSize = sizeof(UniformData);
+	VkDeviceSize buffer_size = sizeof(UniformData);
 
+	/*
 	_create_memory_buffer(
 		bufferSize,
 		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1264,14 +1289,23 @@ static bool _create_uniform_data_buffer()
 		&_host_uniform_data_buffer,
 		&_host_uniform_data_buffer_memory
 	);
+	*/
 
-	_create_memory_buffer(
-		bufferSize,
+	if (!_create_memory_buffer(
+		buffer_size,
 		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
 		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
 		&_device_uniform_data_buffer,
 		&_device_uniform_data_buffer_memory
-	);
+	)) {
+		return false;
+	}
+
+	void* data;
+
+	vkMapMemory(_device, _device_uniform_data_buffer_memory, 0, buffer_size, 0, &data);
+	memcpy(data, &_uniform_data, (uint32_t)buffer_size);
+	vkUnmapMemory(_device, _device_uniform_data_buffer_memory);
 
 	return true;
 }
@@ -1486,7 +1520,7 @@ static void _window_resize_callback(GLFWwindow* window, int width, int height)
 		_create_graphics_pipeline() &&
 		_create_framebuffers() &&
 		_write_image_draw_command_buffers()
-		) {
+	) {
 		_draw_frame();
 	}
 	else {
@@ -1523,7 +1557,6 @@ bool setup_window_and_gpu()
 	if (!glfwInit()) // to know which extensions GLFW requires
 	{
 		printf("Failed to initialize GLFW.");
-
 		return false;
 	}
 
@@ -1538,7 +1571,6 @@ bool setup_window_and_gpu()
 		if (!_instance_supports_required_layers())
 		{
 			printf("Validation layers requested, but not available.\n");
-
 			return false;
 		}
 	}
@@ -1546,119 +1578,126 @@ bool setup_window_and_gpu()
 	if (!_instance_supports_required_extensions())
 	{
 		printf("Some extensions are not supported.\n");
-
 		return false;
 	}
 
 	if (!_create_instance())
 	{
 		printf("Failed to create instance.\n");
-
 		return false;
 	}
 
 	if (!_setup_debug_callback())
 	{
 		printf("Failed to set up debug callback.\n");
-
 		return false;
 	}
 
 	if (!_init_window())
 	{
 		printf("Failed to init window.");
-
 		return false;
 	}
 
 	if (VK_SUCCESS != glfwCreateWindowSurface(_instance, _window, NULL, &(_surface)))
 	{
 		printf("Failed to create surface.\n");
-
 		return false;
 	}
 
 	if (!_pick_physical_device())
 	{
 		printf("Failed to find suitable GPU.");
-
 		return false;
 	}
 
 	if (!_create_logical_device())
 	{
 		printf("Failed to create logical device.");
-
 		return false;
 	}
 
 	if (!_create_swap_chain())
 	{
 		printf("Failed to create swap chain.");
-
 		return false;
 	}
 
 	if (!_create_render_pass())
 	{
 		printf("Failed to create render pass.");
+		return false;
+	}
 
+	if (!_create_vertex_buffer())
+	{
+		printf("Failed to create vertex buffer.");
+		return false;
+	}
+
+	if (!_create_index_buffer())
+	{
+		printf("Failed to create index buffer.");
+		return false;
+	}
+
+	if (!_create_uniform_data_buffer())
+	{
+		printf("Failed to create uniform data buffer.");
+		return false;
+	}
+
+	if (!_create_descriptor_pool())
+	{
+		printf("Failed to create descriptor pool.");
 		return false;
 	}
 
 	if (!_create_descriptor_set_layout())
 	{
 		printf("Failed to create descriptor set layout.");
-
 		return false;
 	}
 
 	if (!_create_descriptor_sets())
 	{
 		printf("Failed to allocate descriptor sets.");
-
 		return false;
 	}
 
 	if (!_create_graphics_pipeline())
 	{
 		printf("Failed to create graphics pipeline.");
-
 		return false;
 	}
-
+	/*
 	if (!_create_compute_pipeline())
 	{
 		printf("Failed to create compute pipeline.");
-
 		return false;
 	}
-
+	*/
 	if (!_create_depth_resources())
 	{
 		printf("Failed to create depth resources.");
-
 		return false;
 	}
 
 	if (!_create_framebuffers())
 	{
 		printf("Failed to create swap chain framebuffers.");
-
 		return false;
 	}
 
 	if (!_create_command_pool_and_allocate_buffers())
 	{
 		printf("Failed to create command pool or allocate buffers.");
-
 		return false;
 	}
 
 	if (!_create_semaphores())
 	{
 		printf("Failed to create semaphores.");
-
 		return false;
 	}
 
@@ -1711,8 +1750,37 @@ void create_particles()
 	_particles[7].position.z = 1.0f;
 	_particles[7].color_idx = 0;
 
-	_projection_matrix = get_perspective_projection_matrix(_vertical_fov, _display_aspect_ratio, 0.1f, 9.0f);
-	_view_matrix = get_view_matrix(_eye, _look_at, _up);
+	Vector_3 top_left = { .x = -0.5, .y = 0.5f, .z = 0.0f };
+	Vector_3 bot_left = { .x = -0.5f, .y = -0.5f, .z = 0.0f };
+	Vector_3 bot_right = { .x = 0.5f, .y = -0.5f, .z = 0.0f };
+	Vector_3 top_right = { .x = 0.5f, .y = 0.5f, .z = 0.0f };
+
+	_vertices.count = 4;
+	_vertices.data = (Vector_3*)malloc(sizeof(Vector_3) * _vertices.count);
+
+	_vertices.data[0] = top_left;
+	_vertices.data[1] = bot_left;
+	_vertices.data[2] = bot_right;
+	_vertices.data[3] = top_right;
+
+	_indices.count = 6;
+	_indices.data = (uint32_t*)malloc(sizeof(uint32_t) * _indices.count);
+
+	_indices.data[0] = 0;
+	_indices.data[1] = 1;
+	_indices.data[2] = 2;
+	_indices.data[3] = 0;
+	_indices.data[4] = 2;
+	_indices.data[5] = 3;
+
+	_uniform_data.mvp.model = _model;
+	_uniform_data.mvp.view = _view;
+	_uniform_data.mvp.projection = _projection;
+
+	/*
+	_projection = get_perspective_projection_matrix(_vertical_fov, _display_aspect_ratio, 0.1f, 9.0f);
+	_view = get_view_matrix(_eye, _look_at, _up);
+	*/
 }
 void destroy_particles()
 {

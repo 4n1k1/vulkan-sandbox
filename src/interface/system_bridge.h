@@ -109,7 +109,7 @@ typedef struct Vertex
 
 typedef struct Vertices
 {
-	Vertex *data;
+	Vector_3 *data;
 	uint32_t count;
 
 } Vertices;
