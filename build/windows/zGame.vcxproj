@@ -190,9 +190,9 @@
     <ClInclude Include="..\..\src\interface\system_bridge.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\src\shaders\compute" />
-    <None Include="..\..\src\shaders\fragment" />
-    <None Include="..\..\src\shaders\vertex" />
+    <None Include="..\..\src\shaders\shader.comp" />
+    <None Include="..\..\src\shaders\shader.frag" />
+    <None Include="..\..\src\shaders\shader.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

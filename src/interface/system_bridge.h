@@ -103,8 +103,6 @@ typedef struct Vertex
 	float y;
 	float z;
 
-	Color color;
-
 } Vertex;
 
 typedef struct Vertices
@@ -141,7 +139,7 @@ typedef struct MVP
 typedef struct UniformData
 {
 	MVP mvp;
-	Color colors[1];
+	Color color;
 
 } UniformData;
 

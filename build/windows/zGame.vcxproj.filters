@@ -40,13 +40,13 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\src\shaders\fragment">
+    <None Include="..\..\src\shaders\shader.vert">
       <Filter>shaders</Filter>
     </None>
-    <None Include="..\..\src\shaders\vertex">
+    <None Include="..\..\src\shaders\shader.frag">
       <Filter>shaders</Filter>
     </None>
-    <None Include="..\..\src\shaders\compute">
+    <None Include="..\..\src\shaders\shader.comp">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>
