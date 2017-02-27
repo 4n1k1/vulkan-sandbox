@@ -164,6 +164,16 @@ static Particle *_particles;
 
 static bool _begin_one_time_command()
 {
+	/*
+	if (
+		vkResetCommandBuffer(
+			_command_buffers.data[_one_time_command_buffer_idx],
+			VK_COMMAND_BUFFER_RESET_RELEASE_RESOURCES_BIT
+		) != VK_SUCCESS
+	) {
+		return false;
+	}
+	*/
 	VkCommandBufferBeginInfo beginInfo = {
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
@@ -1436,10 +1446,10 @@ static bool _create_command_pools_and_allocate_buffers()
 	};
 
 	_one_time_command_buffer_idx = 0;
-	_image_draw_command_buffers_begin_idx = 0;
-	_compute_command_buffer_idx = _image_draw_command_buffers_begin_idx + _swap_chain_framebuffers.count;
+	_image_draw_command_buffers_begin_idx = 1;
+	_compute_command_buffer_idx = _image_draw_command_buffers_begin_idx + _swap_chain_images.count;
 
-	_command_buffers.count = 2 + _swap_chain_framebuffers.count;
+	_command_buffers.count = 2 + _swap_chain_images.count;
 	_command_buffers.data = (VkCommandBuffer*)malloc(sizeof(VkCommandBuffer) * _command_buffers.count);
 
 	if (
@@ -1470,14 +1480,16 @@ static bool _create_command_pools_and_allocate_buffers()
 }
 static bool _write_image_draw_command_buffers()
 {
-	for (uint32_t i = _image_draw_command_buffers_begin_idx; i < _command_buffers.count; i++)
+	for (uint32_t i = 0; i < _swap_chain_images.count; i++)
 	{
+		uint32_t idx = _image_draw_command_buffers_begin_idx + i;
+
 		VkCommandBufferBeginInfo beginInfo = {
 			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 			.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT,
 			.pInheritanceInfo = NULL, // Optional
 		};
-		vkBeginCommandBuffer(_command_buffers.data[i], &beginInfo);
+		vkBeginCommandBuffer(_command_buffers.data[idx], &beginInfo);
 
 		VkRenderPassBeginInfo renderPassInfo = {
 			.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -1489,7 +1501,7 @@ static bool _write_image_draw_command_buffers()
 
 		VkClearValue clearValues[2];
 		VkClearColorValue clear_color = {
-			.float32 = { 0.0f, 0.0f, 0.0f, 1.0f },
+			.float32 = { 0.0f, 0.0f, 0.0f, 0.0f },
 		};
 		VkClearDepthStencilValue clear_depth_stencil = {
 			.depth = 1.0f,
@@ -1501,18 +1513,18 @@ static bool _write_image_draw_command_buffers()
 		renderPassInfo.clearValueCount = 2;
 		renderPassInfo.pClearValues = clearValues;
 
-		vkCmdBeginRenderPass(_command_buffers.data[i], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+		vkCmdBeginRenderPass(_command_buffers.data[idx], &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 
-		vkCmdBindPipeline(_command_buffers.data[i], VK_PIPELINE_BIND_POINT_GRAPHICS, _graphics_pipeline);
+		vkCmdBindPipeline(_command_buffers.data[idx], VK_PIPELINE_BIND_POINT_GRAPHICS, _graphics_pipeline);
 
 		VkDeviceSize offsets[] = { 0 };
 
-		vkCmdBindVertexBuffers(_command_buffers.data[i], 0, 1, &_device_vertex_buffer, offsets);
-		vkCmdBindIndexBuffer(_command_buffers.data[i], _device_index_buffer, 0, VK_INDEX_TYPE_UINT32);
-		vkCmdDrawIndexed(_command_buffers.data[i], _indices.count, 1, 0, 0, 0);
-		vkCmdEndRenderPass(_command_buffers.data[i]);
+		vkCmdBindVertexBuffers(_command_buffers.data[idx], 0, 1, &_device_vertex_buffer, offsets);
+		vkCmdBindIndexBuffer(_command_buffers.data[idx], _device_index_buffer, 0, VK_INDEX_TYPE_UINT32);
+		vkCmdDrawIndexed(_command_buffers.data[idx], _indices.count, 1, 0, 0, 0);
+		vkCmdEndRenderPass(_command_buffers.data[idx]);
 
-		if (vkEndCommandBuffer(_command_buffers.data[i]) != VK_SUCCESS) {
+		if (vkEndCommandBuffer(_command_buffers.data[idx]) != VK_SUCCESS) {
 			return false;
 		}
 	}
@@ -1761,6 +1773,12 @@ bool setup_window_and_gpu()
 		return false;
 	}
 
+	if (!_write_image_draw_command_buffers())
+	{
+		printf("Couldn't write draw commands.");
+		return false;
+	}
+
 	return true;
 }
 
@@ -1894,10 +1912,6 @@ void destroy_window_and_free_gpu()
 	free(_fragment_shader_code);
 	free(_compute_shader_code);
 
-	vkFreeCommandBuffers(_device, _long_live_buffers_pool, _command_buffers.count, _command_buffers.data);
-	free(_command_buffers.data);
-	vkDestroyCommandPool(_device, _long_live_buffers_pool, NULL);
-
 	for (uint32_t i = 0; i < _swap_chain_framebuffers.count; i += 1)
 	{
 		vkDestroyFramebuffer(_device, _swap_chain_framebuffers.data[i], NULL);
@@ -1911,7 +1925,6 @@ void destroy_window_and_free_gpu()
 	vkDestroyShaderModule(_device, _fragment_shader, NULL);
 	vkDestroyPipeline(_device, _graphics_pipeline, NULL);
 	vkDestroyPipelineLayout(_device, _graphics_pipeline_layout, NULL);
-	vkDestroyDescriptorSetLayout(_device, _descriptor_set_layout, NULL);
 	vkDestroyRenderPass(_device, _render_pass, NULL);
 
 	for (uint32_t i = 0; i < _swap_chain_image_views.count; i += 1)
