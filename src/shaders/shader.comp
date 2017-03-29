@@ -1,5 +1,83 @@
 #version 450
 
+struct Particle
+{
+	vec4 position;
+};
+
+layout(binding=0) buffer Vertices
+{
+	vec4 vertices[];
+};
+
+layout(binding=1) buffer Indices
+{
+	uint indices[];
+};
+
+layout(binding=2) uniform UniformBufferObject
+{
+	mat4 model;
+	mat4 view;
+	mat4 proj;
+
+	vec4 colors[];
+	uint particle_count;
+	float particle_radius;
+
+} ubo;
+
+layout(binding=3) buffer Particles
+{
+	Particle particles[];
+};
+
 void main()
 {
+	uint particle_idx = gl_GlobalInvocationID.x;
+
+	if (particle_idx >= ubo.particle_count) return;
+
+	uint first_vertex_idx = particle_idx * 4;
+	uint first_index_idx = particle_idx * 6;
+
+	vec4 particle_position = ubo.proj * ubo.view * ubo.model * particles[particle_idx].position;
+
+	uint v_idx_0 = first_vertex_idx;
+
+	vertices[v_idx_0].x = particle_position.x - ubo.particle_radius;
+	vertices[v_idx_0].y = particle_position.y + ubo.particle_radius;
+	vertices[v_idx_0].z = particle_position.z;
+	vertices[v_idx_0].w = particle_position.w;
+
+	uint v_idx_1 = v_idx_0 + 1;
+
+	vertices[v_idx_1].x = particle_position.x - ubo.particle_radius;
+	vertices[v_idx_1].y = particle_position.y - ubo.particle_radius;
+	vertices[v_idx_1].z = particle_position.z;
+	vertices[v_idx_1].w = particle_position.w;
+
+	uint v_idx_2 = v_idx_1 + 1;
+
+	vertices[v_idx_2].x = particle_position.x + ubo.particle_radius;
+	vertices[v_idx_2].y = particle_position.y - ubo.particle_radius;
+	vertices[v_idx_2].z = particle_position.z;
+	vertices[v_idx_2].w = particle_position.w;
+
+	uint v_idx_3 = v_idx_2 + 1;
+
+	vertices[v_idx_3].x = particle_position.x + ubo.particle_radius;
+	vertices[v_idx_3].y = particle_position.y + ubo.particle_radius;
+	vertices[v_idx_3].z = particle_position.z;
+	vertices[v_idx_3].w = particle_position.w;
+
+	uint i_idx = first_index_idx;
+
+	indices[i_idx] = v_idx_0; i_idx += 1;
+	indices[i_idx] = v_idx_1; i_idx += 1;
+	indices[i_idx] = v_idx_2; i_idx += 1;
+
+	indices[i_idx] = v_idx_0; i_idx += 1;
+	indices[i_idx] = v_idx_2; i_idx += 1;
+	indices[i_idx] = v_idx_3;
 }

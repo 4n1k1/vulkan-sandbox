@@ -8,6 +8,50 @@
 
 #include "math3d.h"
 
+#define VK_FLAGS_NONE 0
+#define CHECK_VK_RESULT(action) \
+{                               \
+	if (VK_SUCCESS != (action)) \
+	{                           \
+		return false;           \
+	}                           \
+}
+
+#define CHECK_VK_RESULT_M(action, message) \
+{                                          \
+	if (VK_SUCCESS != (action))            \
+	{                                      \
+		printf("%s\n", message);           \
+		return false;                      \
+	}                                      \
+}
+
+#define CHECK_RESULT(action) \
+{                            \
+	if (!(action))           \
+	{                        \
+		return false;        \
+	}                        \
+}
+
+#define CHECK_RESULT_M(action, message) \
+{                                       \
+	if (!(action))                      \
+	{                                   \
+		printf("%s\n", message);        \
+		return false;                   \
+	}                                   \
+}
+
+#define CHECK_GLFW_RESULT_M(action, message) \
+{                                            \
+	if (GLFW_TRUE != (action))               \
+	{                                        \
+		printf("%s\n", message);             \
+		return false;                        \
+	}                                        \
+}
+
 typedef struct RequiredValidationLayers
 {
 	char *names[1];
@@ -107,7 +151,7 @@ typedef struct Vertex
 
 typedef struct Vertices
 {
-	Vector_3 *data;
+	Vector4 *data;
 	uint32_t count;
 
 } Vertices;
@@ -122,17 +166,15 @@ typedef struct Indices
 
 typedef struct Particle
 {
-	Vector_3 position;
-
-	uint32_t color_idx;
+	Vector4 position;
 
 } Particle;
 
 typedef struct MVP
 {
-	Matrix_4x4 model;
-	Matrix_4x4 view;
-	Matrix_4x4 projection;
+	Matrix4x4 model;
+	Matrix4x4 view;
+	Matrix4x4 projection;
 
 } MVP;
 
@@ -140,6 +182,8 @@ typedef struct UniformData
 {
 	MVP mvp;
 	Color color;
+	uint32_t particle_count;
+	float particle_radius;
 
 } UniformData;
 

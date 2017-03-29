@@ -1,27 +1,55 @@
 #ifndef Z_GAME_MATH3D
 #define Z_GAME_MATH3D
 
-typedef struct Matrix_4x4
+typedef struct Matrix4x4
 {
 	float data[16];
 
-} Matrix_4x4;
+} Matrix4x4;
+typedef struct Quaternion
+{
+	float x;
+	float y;
+	float z;
+	float w;
 
-typedef struct Vector_3
+} Quaternion;
+typedef struct Vector3
 {
 	float x;
 	float y;
 	float z;
 
-} Vector_3;
+} Vector3;
+typedef struct Vector4
+{
+	float x;
+	float y;
+	float z;
+	float w;
 
-Matrix_4x4 get_perspective_projection_matrix(float vertical_fov, float aspect, float z_near, float z_far);
-Matrix_4x4 get_view_matrix(Vector_3 eye, Vector_3 look_at, Vector_3 up);
+} Vector4;
 
-Vector_3 get_subtracted_vector(const Vector_3 v0, const Vector_3 v1);
-Vector_3 get_normalized_vector(const Vector_3 original_vector);
-Vector_3 get_cross_product(const Vector_3 v0, const Vector_3 v1);
+void update_perspective_projection_matrix(
+	Matrix4x4 *proj,
 
-float get_dot_product(const Vector_3 v0, const Vector_3 v1);
+	const float vertical_fov,
+	const float aspect,
+	const float z_near,
+	const float z_far
+);
+
+Vector3 get_subtracted(const Vector3 *v0, const Vector3 *v1);
+Vector3 get_normalized(const Vector3 *original_vector);
+Vector3 get_cross_product(const Vector3 *v0, const Vector3 *v1);
+
+float get_dot_product(const Vector3 *v0, const Vector3 *v1);
+
+Quaternion get_multiplied_q(const Quaternion *q, const Quaternion *s);
+Matrix4x4 get_multiplied_m(const Matrix4x4 *m0, const Matrix4x4 *m1);
+
+Matrix4x4 get_transform(const Quaternion *q);
+
+Quaternion get_quaternion(const float angle, const Vector3 *axis);
 
 #endif
