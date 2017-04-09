@@ -52,26 +52,12 @@
 	}                                        \
 }
 
-typedef struct RequiredValidationLayers
-{
-	char *names[1];
-	uint32_t count;
-
-} RequiredValidationLayers;
-
-typedef struct RequiredGLFWExtensions
+typedef struct Extensions
 {
 	const char **names;
 	uint32_t count;
 
-} RequiredGLFWExtensions;
-
-typedef struct ExtensionsToEnable
-{
-	char const **names;
-	uint32_t count;
-
-} ExtensionsToEnable;
+} Extensions;
 
 typedef struct OperationQueueFamilies
 {
@@ -96,13 +82,6 @@ typedef struct PresentModes
 	uint32_t count;
 
 } PresentModes;
-
-typedef struct RequiredPhysicalDeviceExtensions
-{
-	char *names[1];
-	uint32_t count;
-
-} RequiredPhysicalDeviceExtensions;
 
 typedef struct SwapChainImages
 {
@@ -143,15 +122,14 @@ typedef struct Color
 
 typedef struct Vertex
 {
-	float x;
-	float y;
-	float z;
+	Vector4 position;
+	Color color;
 
 } Vertex;
 
 typedef struct Vertices
 {
-	Vector4 *data;
+	Vertex *data;
 	uint32_t count;
 
 } Vertices;
@@ -167,21 +145,16 @@ typedef struct Indices
 typedef struct Particle
 {
 	Vector4 position;
+	Color color;
 
 } Particle;
 
-typedef struct MVP
+typedef struct UniformData
 {
 	Matrix4x4 model;
 	Matrix4x4 view;
 	Matrix4x4 projection;
 
-} MVP;
-
-typedef struct UniformData
-{
-	MVP mvp;
-	Color color;
 	uint32_t particle_count;
 	float particle_radius;
 

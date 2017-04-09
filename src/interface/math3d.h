@@ -1,6 +1,9 @@
 #ifndef Z_GAME_MATH3D
 #define Z_GAME_MATH3D
 
+#define _USE_MATH_DEFINES
+#include <math.h>
+
 typedef struct Matrix4x4
 {
 	float data[16];

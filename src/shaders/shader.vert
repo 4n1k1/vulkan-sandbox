@@ -7,11 +7,14 @@ layout(binding = 2) uniform UniformBufferObject
 	mat4 view;
 	mat4 proj;
 
-	vec4 colors;
+	uint particle_count;
+	float particle_radius;
 
 } ubo;
 
-layout(location = 0) in vec3 position;
+layout(location = 0) in vec4 position;
+layout(location = 1) in vec4 color;
+
 layout(location = 0) out vec4 fragColor;
 
 out gl_PerVertex
@@ -21,6 +24,6 @@ out gl_PerVertex
 
 void main()
 {
-	fragColor = vec4(ubo.colors[0]);
-	gl_Position = vec4(position, 1.0);
+	fragColor = color;
+	gl_Position = position;
 }

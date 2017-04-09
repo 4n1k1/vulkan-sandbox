@@ -1,13 +1,15 @@
 #version 450
+#extension GL_ARB_separate_shader_objects : enable
 
-struct Particle
+struct Vertex
 {
 	vec4 position;
+	vec4 color;
 };
 
 layout(binding=0) buffer Vertices
 {
-	vec4 vertices[];
+	Vertex vertices[];
 };
 
 layout(binding=1) buffer Indices
@@ -21,7 +23,6 @@ layout(binding=2) uniform UniformBufferObject
 	mat4 view;
 	mat4 proj;
 
-	vec4 colors[];
 	uint particle_count;
 	float particle_radius;
 
@@ -29,7 +30,7 @@ layout(binding=2) uniform UniformBufferObject
 
 layout(binding=3) buffer Particles
 {
-	Particle particles[];
+	Vertex particles[];
 };
 
 void main()
@@ -41,35 +42,46 @@ void main()
 	uint first_vertex_idx = particle_idx * 4;
 	uint first_index_idx = particle_idx * 6;
 
-	vec4 particle_position = ubo.proj * ubo.view * ubo.model * particles[particle_idx].position;
+	/*
+		Validation layer issue below.
+		https://github.com/KhronosGroup/glslang/commit/4bf71550519121504c171a8c5b569d048e78d597
+		TODO: remove that comment after validation layer issue is gone
+	*/
+	Vertex particle = particles[particle_idx];
+
+	particle.position = ubo.proj * ubo.view * ubo.model * particle.position;
 
 	uint v_idx_0 = first_vertex_idx;
 
-	vertices[v_idx_0].x = particle_position.x - ubo.particle_radius;
-	vertices[v_idx_0].y = particle_position.y + ubo.particle_radius;
-	vertices[v_idx_0].z = particle_position.z;
-	vertices[v_idx_0].w = particle_position.w;
+	vertices[v_idx_0].position.x = particle.position.x - ubo.particle_radius;
+	vertices[v_idx_0].position.y = particle.position.y + ubo.particle_radius;
+	vertices[v_idx_0].position.z = particle.position.z;
+	vertices[v_idx_0].position.w = particle.position.w;
+	vertices[v_idx_0].color = particle.color;
 
 	uint v_idx_1 = v_idx_0 + 1;
 
-	vertices[v_idx_1].x = particle_position.x - ubo.particle_radius;
-	vertices[v_idx_1].y = particle_position.y - ubo.particle_radius;
-	vertices[v_idx_1].z = particle_position.z;
-	vertices[v_idx_1].w = particle_position.w;
+	vertices[v_idx_1].position.x = particle.position.x - ubo.particle_radius;
+	vertices[v_idx_1].position.y = particle.position.y - ubo.particle_radius;
+	vertices[v_idx_1].position.z = particle.position.z;
+	vertices[v_idx_1].position.w = particle.position.w;
+	vertices[v_idx_1].color = particle.color;
 
 	uint v_idx_2 = v_idx_1 + 1;
 
-	vertices[v_idx_2].x = particle_position.x + ubo.particle_radius;
-	vertices[v_idx_2].y = particle_position.y - ubo.particle_radius;
-	vertices[v_idx_2].z = particle_position.z;
-	vertices[v_idx_2].w = particle_position.w;
+	vertices[v_idx_2].position.x = particle.position.x + ubo.particle_radius;
+	vertices[v_idx_2].position.y = particle.position.y - ubo.particle_radius;
+	vertices[v_idx_2].position.z = particle.position.z;
+	vertices[v_idx_2].position.w = particle.position.w;
+	vertices[v_idx_2].color = particle.color;
 
 	uint v_idx_3 = v_idx_2 + 1;
 
-	vertices[v_idx_3].x = particle_position.x + ubo.particle_radius;
-	vertices[v_idx_3].y = particle_position.y + ubo.particle_radius;
-	vertices[v_idx_3].z = particle_position.z;
-	vertices[v_idx_3].w = particle_position.w;
+	vertices[v_idx_3].position.x = particle.position.x + ubo.particle_radius;
+	vertices[v_idx_3].position.y = particle.position.y + ubo.particle_radius;
+	vertices[v_idx_3].position.z = particle.position.z;
+	vertices[v_idx_3].position.w = particle.position.w;
+	vertices[v_idx_3].color = particle.color;
 
 	uint i_idx = first_index_idx;
 

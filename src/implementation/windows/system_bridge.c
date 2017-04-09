@@ -8,27 +8,16 @@
 
 #define DEVICE_QUEUES_COUNT 3
 #define GPU_DATA_BINDINGS_COUNT 4
-#define PARTICLE_COUNT 3
-
-/*
-	Core concerns.
-
-	1) Code requires GPU to be able to present, render and compute;
-	2) Command pools/buffers are not optimized (
-		typedef enum VkCommandPoolCreateFlagBits {
-			VK_COMMAND_POOL_CREATE_TRANSIENT_BIT = 0x00000001,
-			VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT = 0x00000002,
-		} VkCommandPoolCreateFlagBits;
-	).
-*/
+#define PARTICLE_COUNT 8
+#define PHYSICAL_DEVICE_EXTENSIONS_COUNT 1
+#define VALIDATION_LAYERS_COUNT 1
 
 /* Module state */
 
 static const uint32_t _DEFAULT_WINDOW_WIDTH = 800;
 static const uint32_t _DEFAULT_WINDOW_HEIGHT = 600;
 
-static const float _vertical_fov = 90.0f;
-static const float _display_aspect_ratio = 16.0f / 9.0f;
+static const float _display_aspect_ratio = 4.0f / 3.0f;
 
 static Matrix4x4 _projection = {
 	.data = {
@@ -57,11 +46,6 @@ static Matrix4x4 _model = {
 	}
 };
 
-static RequiredPhysicalDeviceExtensions _required_physical_device_extensions = {
-	.names = { VK_KHR_SWAPCHAIN_EXTENSION_NAME },
-	.count = 1,
-};
-
 static OperationQueueFamilies _operation_queue_families = {
 	.graphics_family_idx = -1,
 	.compute_family_idx = -1,
@@ -71,13 +55,15 @@ static OperationQueueFamilies _operation_queue_families = {
 };
 
 static GLFWwindow *_window = NULL;
-static RequiredGLFWExtensions _required_glfw_extensions;
-static ExtensionsToEnable _instance_extensions_to_enable;
 static VkInstance _instance;
 
 #ifdef _DEBUG
 static VkDebugReportCallbackEXT _debug_callback_object;
+static Extensions _required_validation_layers;
 #endif
+
+static Extensions _required_instance_extensions;
+static Extensions _required_physical_device_extensions;
 
 static VkSurfaceKHR _surface;
 static VkSurfaceCapabilitiesKHR _surface_capabilities;
@@ -287,33 +273,69 @@ static bool _copy_buffer(VkBuffer *dst_buffer, VkBuffer *src_buffer, VkDeviceSiz
 
 /* Secondary logic */
 
+static void _setup_required_extensions()
+{
+	const char **glfw_names;
+
+	uint32_t glfw_count;
+	uint32_t total_count;
+
+	glfw_names = glfwGetRequiredInstanceExtensions(&glfw_count);
+
+	total_count = glfw_count;
+
+#ifdef _DEBUG
+	total_count += 1;  /* VK_EXT_DEBUG_REPORT_EXTENSION_NAME */
+#endif
+
+	_required_instance_extensions.names = (char**)malloc(sizeof(char*) * total_count);
+	_required_instance_extensions.count = total_count;
+
+	for (uint32_t i = 0; i < glfw_count; i += 1)
+	{
+		_required_instance_extensions.names[i] = glfw_names[i];
+	}
+
+#ifdef _DEBUG
+	_required_instance_extensions.names[glfw_count] = VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
+#endif
+}
+static bool _physical_device_supports_required_extensions(const VkPhysicalDevice* physical_device) {
+	uint32_t supported_exts_num;
+	vkEnumerateDeviceExtensionProperties(*physical_device, NULL, &supported_exts_num, NULL);
+
+		VkExtensionProperties *supported_extensions = (VkExtensionProperties *)malloc(sizeof(VkExtensionProperties) * supported_exts_num);
+
+		vkEnumerateDeviceExtensionProperties(*physical_device, NULL, &supported_exts_num, supported_extensions);
+
+		uint32_t matches = 0;
+
+		for (uint32_t i = 0; i < _required_physical_device_extensions.count; i += 1)
+		{
+			for (uint32_t j = 0; j < supported_exts_num; j += 1)
+			{
+				VkExtensionProperties *supported_extension = supported_extensions + j;
+
+				if (strcmp(supported_extension->extensionName, _required_physical_device_extensions.names[i]) == 0)
+				{
+					matches += 1;
+				}
+			}
+		}
+
+		bool result = (matches == _required_physical_device_extensions.count);
+
+		free(supported_extensions);
+
+		return result;
+}
 static VkBool32 __stdcall _debug_callback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objType, uint64_t obj, uint32_t location, int32_t code, const char* layerPrefix, const char* msg, void* userData)
 {
-	printf("Vulkan API error: %s.\n", msg);
+	printf("Validation layer issue: %s.\n", msg);
 
 	return VK_FALSE;
 }
 
-static void _set_extensions_to_enable()
-{
-	uint32_t extensions_num = _required_glfw_extensions.count + 1;
-
-	_instance_extensions_to_enable.names = malloc(
-		sizeof(char **) * extensions_num
-	);
-
-	uint32_t extension_to_enable_idx = 0;
-
-	for (uint32_t i = 0; i < _required_glfw_extensions.count; i += 1)
-	{
-		_instance_extensions_to_enable.names[extension_to_enable_idx] = _required_glfw_extensions.names[i];
-		extension_to_enable_idx += 1;
-	}
-
-	_instance_extensions_to_enable.names[extension_to_enable_idx] = VK_EXT_DEBUG_REPORT_EXTENSION_NAME;
-
-	_instance_extensions_to_enable.count = extensions_num;
-}
 static void _set_surface_properties(const VkPhysicalDevice *physical_device)
 {
 	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(*physical_device, _surface, &_surface_capabilities);
@@ -379,11 +401,16 @@ static bool _instance_supports_required_extensions()
 
 	bool result = true;
 
-	for (uint32_t i = 0; i < _required_glfw_extensions.count; i += 1) {
+	for (uint32_t i = 0; i < _required_instance_extensions.count; i += 1) {
 		bool ext_found = false;
 
-		for (uint32_t j = 0; j < supported_exts_num; j += 1) {
-			if (strcmp(supported_exts[j].extensionName, _required_glfw_extensions.names[i]) == 0) {
+		const char* ext_name = _required_instance_extensions.names[i];
+
+		for (uint32_t j = 0; j < supported_exts_num; j += 1)
+		{
+			const char* s_ext_name = supported_exts[j].extensionName;
+
+			if (strcmp(supported_exts[j].extensionName, _required_instance_extensions.names[i]) == 0) {
 				ext_found = true;
 				break;
 			}
@@ -398,35 +425,6 @@ static bool _instance_supports_required_extensions()
 	}
 
 	free(supported_exts);
-
-	return result;
-}
-static bool _physical_device_supports_required_extensions(const VkPhysicalDevice* physical_device) {
-	uint32_t supported_exts_num;
-	vkEnumerateDeviceExtensionProperties(*physical_device, NULL, &supported_exts_num, NULL);
-
-	VkExtensionProperties *supported_extensions = (VkExtensionProperties *)malloc(sizeof(VkExtensionProperties) * supported_exts_num);
-
-	vkEnumerateDeviceExtensionProperties(*physical_device, NULL, &supported_exts_num, supported_extensions);
-
-	uint32_t matches = 0;
-
-	for (uint32_t i = 0; i < _required_physical_device_extensions.count; i += 1)
-	{
-		for (uint32_t j = 0; j < supported_exts_num; j += 1)
-		{
-			VkExtensionProperties *supported_extension = supported_extensions + j;
-
-			if (strcmp(supported_extension->extensionName, _required_physical_device_extensions.names[i]) == 0)
-			{
-				matches += 1;
-			}
-		}
-	}
-
-	bool result = (matches == _required_physical_device_extensions.count);
-
-	free(supported_extensions);
 
 	return result;
 }
@@ -501,13 +499,13 @@ static bool _physical_device_suitable(const VkPhysicalDevice* physical_device)
 
 	bool surface_output_supported = (
 		_surface_formats.count != 0 &&
+		extensions_supported &&
 		_present_modes.count != 0
 	);
 
 	return (
 		device_properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU &&
 		_operation_queue_families.use_same_family &&
-		extensions_supported &&
 		surface_output_supported
 	);
 }
@@ -588,28 +586,40 @@ static bool _pick_depth_buffer_format()
 
 /* Primary logic */
 
-static bool _create_instance()
-{
-	VkApplicationInfo app_info = {
-		.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-		.pApplicationName = "zGame",
-		.applicationVersion = VK_MAKE_VERSION(1, 0, 0),
-		.pEngineName = "zEngine",
-		.engineVersion = VK_MAKE_VERSION(1, 0, 0),
-		.apiVersion = VK_API_VERSION_1_0
-	};
-
-	VkInstanceCreateInfo create_info = {
-		.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-		.pApplicationInfo = &app_info,
-	};
-
-	create_info.enabledExtensionCount = _instance_extensions_to_enable.count;
-	create_info.ppEnabledExtensionNames = _instance_extensions_to_enable.names;
-
-	return VK_SUCCESS == vkCreateInstance(&create_info, NULL, &_instance);
-}
 #ifdef _DEBUG
+static bool _instance_supports_required_layers()
+{
+	uint32_t supported_layers_num;
+	vkEnumerateInstanceLayerProperties(&supported_layers_num, NULL);
+
+	VkLayerProperties *supported_layers = malloc(sizeof(VkLayerProperties) * supported_layers_num);
+
+	vkEnumerateInstanceLayerProperties(&supported_layers_num, supported_layers);
+
+	bool result = true;
+
+	for (uint32_t i = 0; i < _required_validation_layers.count; i += 1)
+	{
+		bool layer_found = false;
+
+		for (uint32_t j = 0; j < supported_layers_num; j += 1) {
+			if (strcmp(supported_layers[j].layerName, _required_validation_layers.names[i]) == 0) {
+				layer_found = true;
+				break;
+			}
+		}
+
+		if (!layer_found)
+		{
+			result = false;
+			break;
+		}
+	}
+
+	free(supported_layers);
+
+	return result;
+}
 static bool _setup_debug_callback()
 {
 	VkDebugReportCallbackCreateInfoEXT create_info = {
@@ -632,6 +642,35 @@ static bool _setup_debug_callback()
 	return true;
 }
 #endif
+
+static bool _create_instance()
+{
+	VkApplicationInfo app_info = {
+		.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+		.pApplicationName = "zGame",
+		.applicationVersion = VK_MAKE_VERSION(1, 0, 0),
+		.pEngineName = "zEngine",
+		.engineVersion = VK_MAKE_VERSION(1, 0, 0),
+		.apiVersion = VK_API_VERSION_1_0
+	};
+
+	VkInstanceCreateInfo create_info = {
+		.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+		.pApplicationInfo = &app_info,
+	};
+
+	create_info.ppEnabledExtensionNames = _required_instance_extensions.names;
+	create_info.enabledExtensionCount = _required_instance_extensions.count;
+
+#ifdef _DEBUG
+	create_info.enabledLayerCount = _required_validation_layers.count;
+	create_info.ppEnabledLayerNames = _required_validation_layers.names;
+#endif
+
+	VkResult result = vkCreateInstance(&create_info, NULL, &_instance);
+
+	return result == VK_SUCCESS;
+}
 static bool _pick_physical_device()
 {
 	uint32_t devices_num = 0;
@@ -685,11 +724,9 @@ static bool _create_logical_device()
 		.pQueueCreateInfos = &queue_create_info,
 		.queueCreateInfoCount = 1,
 		.pEnabledFeatures = &device_features,
-		.enabledExtensionCount = 0
+		.enabledExtensionCount = _required_physical_device_extensions.count,
+		.ppEnabledExtensionNames = _required_physical_device_extensions.names,
 	};
-
-	create_info.enabledExtensionCount = _required_physical_device_extensions.count;
-	create_info.ppEnabledExtensionNames = _required_physical_device_extensions.names;
 
 	CHECK_VK_RESULT(vkCreateDevice(_physical_device, &create_info, NULL, &_device));
 
@@ -846,21 +883,27 @@ static bool _create_graphics_pipeline()
 
 	VkVertexInputBindingDescription binding_description = {
 		.binding = 0,
-		.stride = sizeof(Vector4),
+		.stride = sizeof(Vertex),
 		.inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
 	};
 
-	VkVertexInputAttributeDescription attribute_descriptions[1];
+	VkVertexInputAttributeDescription attribute_descriptions[2];
 
 	attribute_descriptions[0].binding = 0;
 	attribute_descriptions[0].location = 0;
-	attribute_descriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+	attribute_descriptions[0].format = VK_FORMAT_R32G32B32A32_SFLOAT;
 	attribute_descriptions[0].offset = 0;
+
+	attribute_descriptions[1].binding = 0;
+	attribute_descriptions[1].location = 1;
+	attribute_descriptions[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+	attribute_descriptions[1].offset = sizeof(Vector4);
+
 
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
 		.vertexBindingDescriptionCount = 1,
-		.vertexAttributeDescriptionCount = 1,
+		.vertexAttributeDescriptionCount = 2,
 		.pVertexBindingDescriptions = &binding_description,
 		.pVertexAttributeDescriptions = attribute_descriptions,
 	};
@@ -913,8 +956,8 @@ static bool _create_graphics_pipeline()
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
 		.depthClampEnable = VK_FALSE, // VK_TRUE for shadow maps requires enabling GPU feature
 		.rasterizerDiscardEnable = VK_FALSE,
-		.polygonMode = VK_POLYGON_MODE_LINE,
-		.cullMode = VK_CULL_MODE_NONE,
+		.polygonMode = VK_POLYGON_MODE_FILL,
+		.cullMode = VK_CULL_MODE_BACK_BIT,
 		.frontFace = VK_FRONT_FACE_CLOCKWISE,
 		.lineWidth = 1.0f,
 		.depthBiasEnable = VK_FALSE,
@@ -1284,7 +1327,7 @@ static bool _create_uniform_data_buffer()
 }
 static bool _create_vertex_buffer()
 {
-	VkDeviceSize buffer_size = sizeof(Vector4) * _vertices.count;
+	VkDeviceSize buffer_size = sizeof(Vertex) * _vertices.count;
 
 	CHECK_RESULT(
 		_create_memory_buffer(
@@ -1726,13 +1769,18 @@ bool setup_window_and_gpu()
 {
 	CHECK_GLFW_RESULT_M(glfwInit(), "Failed to initialize GLFW.\n"); // to know which extensions GLFW requires
 
-	_required_glfw_extensions.names = glfwGetRequiredInstanceExtensions(
-		&(_required_glfw_extensions.count)
-	);
-
-	_set_extensions_to_enable();
+	_setup_required_extensions();
 
 	CHECK_RESULT_M(_instance_supports_required_extensions(), "Some extensions are not supported.");
+
+#ifdef _DEBUG
+	_required_validation_layers.names = (char**)malloc(sizeof(char*) * VALIDATION_LAYERS_COUNT);
+	_required_validation_layers.names[0] = "VK_LAYER_LUNARG_standard_validation";
+	_required_validation_layers.count = VALIDATION_LAYERS_COUNT;
+
+	CHECK_RESULT_M(_instance_supports_required_layers(), "Validation layers are not supported.")
+#endif
+
 	CHECK_RESULT_M(_create_instance(), "Failed to create instance.");
 
 #ifdef _DEBUG
@@ -1744,6 +1792,11 @@ bool setup_window_and_gpu()
 		glfwCreateWindowSurface(_instance, _window, NULL, &(_surface)),
 		"Failed to create surface."
 	);
+
+	_required_physical_device_extensions.names = (char**)malloc(sizeof(char*) * PHYSICAL_DEVICE_EXTENSIONS_COUNT);
+	_required_physical_device_extensions.names[0] = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
+	_required_physical_device_extensions.count = PHYSICAL_DEVICE_EXTENSIONS_COUNT;
+
 	CHECK_RESULT_M(_pick_physical_device(), "Failed to find suitable GPU.");
 	CHECK_RESULT_M(_create_logical_device(), "Failed to create logical device.");
 	CHECK_RESULT_M(_create_swap_chain(), "Failed to create swap chain.");
@@ -1775,45 +1828,68 @@ void create_particles()
 {
 	_particles = (Particle*)malloc(sizeof(Particle) * PARTICLE_COUNT);
 
-	_particles[0].position.x = 0.5f;
-	_particles[0].position.y = 0.5f;
-	_particles[0].position.z = 0.0f;
-	_particles[0].position.w = 1.0f;
+	Particle p0 = {
+		.position = { 0.5f, 0.5f, 0.0f, 1.0f },
+		.color = { 1.0f, 0.0f, 0.0f, 1.0f },
+	};
+	_particles[0] = p0;
 
-	_particles[1].position.x = 0.0f;
-	_particles[1].position.y = 0.0f;
-	_particles[1].position.z = 0.0f;
-	_particles[1].position.w = 1.0f;
+	Particle p1 = {
+		.position = { 0.0f, 0.0f, 0.0f, 1.0f },
+		.color = { 0.0f, 1.0f, 0.0f, 1.0f },
+	};
+	_particles[1] = p1;
 
-	_particles[2].position.x = 0.5f;
-	_particles[2].position.y = 0.0f;
-	_particles[2].position.z = 0.0f;
-	_particles[2].position.w = 1.0f;
-/*
-	_particles[3].position.x = 0.0f;
-	_particles[3].position.y = 0.5f;
-	_particles[3].position.z = 0.0f;
-	_particles[3].position.w = 1.0f;
-*/
+	Particle p2 = {
+		.position = { 0.5f, 0.0f, 0.0f, 1.0f },
+		.color = { 0.0f, 0.0f, 1.0f, 1.0f },
+	};
+	_particles[2] = p2;
+
+	Particle p3 = {
+		.position = { 0.0f, 0.5f, 0.0f, 1.0f },
+		.color = { 1.0f, 1.0f, 1.0f, 1.0f },
+	};
+	_particles[3] = p3;
+
+	Particle p4 = {
+		.position = { 0.5f, 0.5f, 0.5f, 1.0f },
+		.color = { 1.0f, 1.0f, 0.0f, 1.0f },
+	};
+	_particles[4] = p4;
+
+	Particle p5 = {
+		.position = { 0.0f, 0.0f, 0.5f, 1.0f },
+		.color = { 0.0f, 1.0f, 1.0f, 1.0f },
+	};
+	_particles[5] = p5;
+
+	Particle p6 = {
+		.position = { 0.5f, 0.0f, 0.5f, 1.0f },
+		.color = { 1.0f, 0.0f, 1.0f, 1.0f },
+	};
+	_particles[6] = p6;
+
+	Particle p7 = {
+		.position = { 0.0f, 0.5f, 0.5f, 1.0f },
+		.color = { 0.7f, 0.2f, 0.1f, 1.0f },
+	};
+	_particles[7] = p7;
+
 	_vertices.count = PARTICLE_COUNT * 4;
-	_vertices.data = (Vector4*)malloc(sizeof(Vector4) * _vertices.count);
+	_vertices.data = (Vertex*)malloc(sizeof(Vertex) * _vertices.count);
 
 	_indices.count = PARTICLE_COUNT * 6;
 	_indices.data = (uint32_t*)malloc(sizeof(uint32_t) * _indices.count);
 
-//	update_perspective_projection_matrix(&_projection, _vertical_fov, _display_aspect_ratio, 0.1f, 10.0f);
+	update_perspective_projection_matrix(&_projection, (float)M_PI / 2.0f, _display_aspect_ratio, 0.1f, 10.0f);
 
-	_uniform_data.mvp.model = _model;
-	_uniform_data.mvp.view = _view;
-	_uniform_data.mvp.projection = _projection;
-
-	_uniform_data.color.red = 1.0f;
-	_uniform_data.color.green = 0.0f;
-	_uniform_data.color.blue = 0.0f;
-	_uniform_data.color.alpha = 1.0f;
+	_uniform_data.model = _model;
+	_uniform_data.view = _view;
+	_uniform_data.projection = _projection;
 
 	_uniform_data.particle_count = PARTICLE_COUNT;
-	_uniform_data.particle_radius = 0.05f;
+	_uniform_data.particle_radius = 0.02f;
 }
 void destroy_particles()
 {
@@ -1827,10 +1903,8 @@ void render()
 
 	clock_t t0, t1;
 	float time_diff = 0.0f;
-	Vector3 rotation_axis = { .x = 1.0f, .y = -1.0f, .z = 1.0f };
+	Vector3 rotation_axis = { .x = 1.0f, .y = 0.0f, .z = 0.0f };
 	Quaternion base = { .x = 0.0f, .y = 0.0f, .z = 0.0f, .w = 1.0f };
-
-	const float pi = 1.14159265358979323846f;
 
 	while (!glfwWindowShouldClose(_window) && draw_success)
 	{
@@ -1838,10 +1912,10 @@ void render()
 
 		t0 = clock();
 
-		Quaternion rotated = get_quaternion((pi / 2.0f) * time_diff, &rotation_axis);
+		Quaternion rotated = get_quaternion(((float)M_PI / 2.0f) * time_diff, &rotation_axis);
 		base = get_multiplied_q(&base, &rotated);
 
-//		_uniform_data.mvp.model = get_transform(&base);
+		_uniform_data.model = get_transform(&base);
 
 		draw_success = (
 			_update_uniform_data_buffer() &&
@@ -1923,11 +1997,15 @@ void destroy_window_and_free_gpu()
 
 	free(_surface_formats.data);
 	free(_present_modes.data);
-	free((void *)_instance_extensions_to_enable.names);
+
+	free((void *)_required_instance_extensions.names);
+	free((void*)_required_physical_device_extensions.names);
 
 	vkDestroySurfaceKHR(_instance, _surface, NULL);
 
 #ifdef _DEBUG
+	free((void*)_required_validation_layers.names);
+
 	PFN_vkDestroyDebugReportCallbackEXT func = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(
 		_instance, "vkDestroyDebugReportCallbackEXT"
 	);
