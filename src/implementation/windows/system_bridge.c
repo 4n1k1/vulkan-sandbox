@@ -17,8 +17,8 @@
 static const uint32_t _DEFAULT_WINDOW_WIDTH = 800;
 static const uint32_t _DEFAULT_WINDOW_HEIGHT = 600;
 
-static const Vector3 _eye = { 0.0f, 0.0f, -2.0f };
-static const Vector3 _up = { 0.0f, 1.0f, -2.0f };
+static const Vector3 _eye = { 0.0f, 0.0f, -1.0f };
+static const Vector3 _up = { 0.0f, 1.0f, -1.0f };
 static const Vector3 _look_at = { 0.0f, 0.0f, 0.0f };
 
 static const float _display_aspect_ratio = 4.0f / 3.0f;
@@ -922,10 +922,7 @@ static bool _create_graphics_pipeline()
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
 		.depthTestEnable = VK_TRUE,
 		.depthWriteEnable = VK_TRUE,
-		.depthCompareOp = VK_COMPARE_OP_LESS,
-		.depthBoundsTestEnable = VK_FALSE,
-		.minDepthBounds = 0.0f, // Optional
-		.maxDepthBounds = 1.0f, // Optional
+		.depthCompareOp = VK_COMPARE_OP_GREATER,
 		.stencilTestEnable = VK_FALSE,
 	};
 
@@ -1038,14 +1035,11 @@ static bool _create_graphics_pipeline()
 		.pViewportState = &viewportState,
 		.pRasterizationState = &rasterizer,
 		.pMultisampleState = &multisampling,
-		.pDepthStencilState = NULL, // Optional
 		.pColorBlendState = &colorBlending,
-		.pDynamicState = NULL, // Optional
 		.layout = _graphics_pipeline_layout,
 		.renderPass = _render_pass,
 		.subpass = 0,
 		.basePipelineHandle = VK_NULL_HANDLE,
-		.basePipelineIndex = -1, // Optional
 		.pDepthStencilState = &depthStencil,
 	};
 
@@ -1520,7 +1514,7 @@ static bool _write_image_draw_command_buffers()
 			.float32 = { 0.0f, 0.0f, 0.0f, 0.0f },
 		};
 		VkClearDepthStencilValue clear_depth_stencil = {
-			.depth = 1.0f,
+			.depth = 0.0f,
 			.stencil = 0,
 		};
 		clearValues[0].color = clear_color;
@@ -1894,7 +1888,7 @@ void create_particles()
 	_uniform_data.projection = _projection;
 
 	_uniform_data.particle_count = PARTICLE_COUNT;
-	_uniform_data.particle_radius = 0.02f;
+	_uniform_data.particle_radius = 0.08f;
 }
 void destroy_particles()
 {

@@ -43,14 +43,39 @@ void main()
 	uint first_index_idx = particle_idx * 6;
 
 	/*
-		Validation layer issue below.
+		Validation layer reports issue due to definition below.
 		https://github.com/KhronosGroup/glslang/commit/4bf71550519121504c171a8c5b569d048e78d597
-		TODO: remove that comment after validation layer issue is gone
+		TODO: remove that comment after validation layer reports no issue
 	*/
 	Vertex particle = particles[particle_idx];
 
 	particle.position = ubo.proj * ubo.view * ubo.model * particle.position;
 
+	/*
+		Vulkan uses the following coordinate system for NDC:
+
+		   Z
+		  /
+		 /
+		+-------- X
+		|
+		|
+		Y
+
+		Rectangle particle:
+
+		1       2
+		+-------+
+		|      /|
+		|     / |
+		|    /  |
+		|   o   |  o - particle coordinates
+		|  /    |
+		| /     |
+		|/      |
+		+-------+
+		0       3
+	*/
 	uint v_idx_0 = first_vertex_idx;
 
 	vertices[v_idx_0].position.x = particle.position.x - ubo.particle_radius;
