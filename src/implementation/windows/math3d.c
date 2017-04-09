@@ -18,6 +18,34 @@ void update_perspective_projection_matrix(
 	proj->data[14] = (z_far * z_near) / (z_far - z_near);
 }
 
+void update_view_matrix(Matrix4x4 *result, const Vector3 *eye, const Vector3 *look_at, const Vector3 *up)
+{
+	const Vector3 sub = get_subtracted(look_at, eye);
+
+	Vector3 f = get_normalized(&sub);
+
+	const Vector3 cross = get_cross_product(up, &f);
+
+	Vector3 s = get_normalized(&cross);
+	Vector3 u = get_cross_product(&f, &s);
+
+	result->data[ 0] = s.x;
+	result->data[ 4] = s.y;
+	result->data[ 8] = s.z;
+
+	result->data[ 1] = u.x;
+	result->data[ 5] = u.y;
+	result->data[ 9] = u.z;
+
+	result->data[ 2] = f.x;
+	result->data[ 6] = f.y;
+	result->data[10] = f.z;
+
+	result->data[12] = -get_dot_product(&s, eye);
+	result->data[13] = -get_dot_product(&u, eye);
+	result->data[14] = get_dot_product(&f, eye);
+}
+
 Vector3 get_subtracted(const Vector3 *v0, const Vector3 *v1)
 {
 	Vector3 result;

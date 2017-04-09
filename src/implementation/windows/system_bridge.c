@@ -17,6 +17,10 @@
 static const uint32_t _DEFAULT_WINDOW_WIDTH = 800;
 static const uint32_t _DEFAULT_WINDOW_HEIGHT = 600;
 
+static const Vector3 _eye = { 0.0f, 0.0f, -2.0f };
+static const Vector3 _up = { 0.0f, 1.0f, -2.0f };
+static const Vector3 _look_at = { 0.0f, 0.0f, 0.0f };
+
 static const float _display_aspect_ratio = 4.0f / 3.0f;
 
 static Matrix4x4 _projection = {
@@ -1883,6 +1887,7 @@ void create_particles()
 	_indices.data = (uint32_t*)malloc(sizeof(uint32_t) * _indices.count);
 
 	update_perspective_projection_matrix(&_projection, (float)M_PI / 2.0f, _display_aspect_ratio, 0.1f, 10.0f);
+	update_view_matrix(&_view, &_eye, &_look_at, &_up);
 
 	_uniform_data.model = _model;
 	_uniform_data.view = _view;

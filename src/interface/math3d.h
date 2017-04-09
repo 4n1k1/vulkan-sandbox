@@ -42,10 +42,18 @@ void update_perspective_projection_matrix(
 	const float z_far
 );
 
+void update_view_matrix(
+	Matrix4x4 *result,
+
+	const Vector3 *eye,
+	const Vector3 *look_at,
+	const Vector3 *up
+);
+
 Vector3 get_subtracted(const Vector3 *v0, const Vector3 *v1);
 Vector3 get_normalized(const Vector3 *original_vector);
-Vector3 get_cross_product(const Vector3 *v0, const Vector3 *v1);
 
+Vector3 get_cross_product(const Vector3 *v0, const Vector3 *v1);
 float get_dot_product(const Vector3 *v0, const Vector3 *v1);
 
 Quaternion get_multiplied_q(const Quaternion *q, const Quaternion *s);
