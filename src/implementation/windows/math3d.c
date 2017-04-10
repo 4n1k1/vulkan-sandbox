@@ -12,7 +12,7 @@ void update_perspective_projection_matrix(
 	float t = tanf(vertical_fov / 2.0f);
 
 	proj->data[ 0] = 1.0f / (aspect * t);
-	proj->data[ 5] = 1.0f / t;
+	proj->data[ 5] = -1.0f / t;
 	proj->data[10] = z_far / (z_near - z_far);
 	proj->data[11] = -1.0f;
 	proj->data[14] = -(z_far * z_near) / (z_far - z_near);
@@ -43,7 +43,7 @@ void update_view_matrix(Matrix4x4 *result, const Vector3 *eye, const Vector3 *lo
 
 	result->data[12] = -get_dot_product(&s, eye);
 	result->data[13] = -get_dot_product(&u, eye);
-	result->data[14] = get_dot_product(&f, eye);
+	result->data[14] =  get_dot_product(&f, eye);
 }
 
 Vector3 get_subtracted(const Vector3 *v0, const Vector3 *v1)
