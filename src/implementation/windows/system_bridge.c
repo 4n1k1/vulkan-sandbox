@@ -21,8 +21,6 @@ static const Vector3 _eye = { 0.0f, 0.0f, -1.0f };
 static const Vector3 _up = { 0.0f, 1.0f, -1.0f };
 static const Vector3 _look_at = { 0.0f, 0.0f, 0.0f };
 
-static const float _display_aspect_ratio = 4.0f / 3.0f;
-
 static Matrix4x4 _projection = {
 	.data = {
 		1.0f, 0.0f, 0.0f, 0.0f,
@@ -922,7 +920,7 @@ static bool _create_graphics_pipeline()
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
 		.depthTestEnable = VK_TRUE,
 		.depthWriteEnable = VK_TRUE,
-		.depthCompareOp = VK_COMPARE_OP_GREATER,
+		.depthCompareOp = VK_COMPARE_OP_LESS,
 		.stencilTestEnable = VK_FALSE,
 	};
 
@@ -1514,7 +1512,7 @@ static bool _write_image_draw_command_buffers()
 			.float32 = { 0.0f, 0.0f, 0.0f, 0.0f },
 		};
 		VkClearDepthStencilValue clear_depth_stencil = {
-			.depth = 0.0f,
+			.depth = 1.0f,
 			.stencil = 0,
 		};
 		clearValues[0].color = clear_color;
@@ -1880,7 +1878,14 @@ void create_particles()
 	_indices.count = PARTICLE_COUNT * 6;
 	_indices.data = (uint32_t*)malloc(sizeof(uint32_t) * _indices.count);
 
-	update_perspective_projection_matrix(&_projection, (float)M_PI / 2.0f, _display_aspect_ratio, 0.1f, 10.0f);
+	update_perspective_projection_matrix(
+		&_projection,
+		(float)M_PI / 2.0f,
+		(float)(_DEFAULT_WINDOW_WIDTH / _DEFAULT_WINDOW_HEIGHT),
+		0.1f,
+		10.0f
+	);
+
 	update_view_matrix(&_view, &_eye, &_look_at, &_up);
 
 	_uniform_data.model = _model;

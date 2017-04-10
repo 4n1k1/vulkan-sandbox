@@ -13,9 +13,9 @@ void update_perspective_projection_matrix(
 
 	proj->data[ 0] = 1.0f / (aspect * t);
 	proj->data[ 5] = 1.0f / t;
-	proj->data[10] = z_near/ (z_near - z_far);
+	proj->data[10] = z_far / (z_near - z_far);
 	proj->data[11] = -1.0f;
-	proj->data[14] = (z_far * z_near) / (z_far - z_near);
+	proj->data[14] = -(z_far * z_near) / (z_far - z_near);
 }
 
 void update_view_matrix(Matrix4x4 *result, const Vector3 *eye, const Vector3 *look_at, const Vector3 *up)
@@ -24,10 +24,10 @@ void update_view_matrix(Matrix4x4 *result, const Vector3 *eye, const Vector3 *lo
 
 	Vector3 f = get_normalized(&sub);
 
-	const Vector3 cross = get_cross_product(up, &f);
+	const Vector3 cross = get_cross_product(&f, up);
 
 	Vector3 s = get_normalized(&cross);
-	Vector3 u = get_cross_product(&f, &s);
+	Vector3 u = get_cross_product(&s, &f);
 
 	result->data[ 0] = s.x;
 	result->data[ 4] = s.y;
@@ -37,9 +37,9 @@ void update_view_matrix(Matrix4x4 *result, const Vector3 *eye, const Vector3 *lo
 	result->data[ 5] = u.y;
 	result->data[ 9] = u.z;
 
-	result->data[ 2] = f.x;
-	result->data[ 6] = f.y;
-	result->data[10] = f.z;
+	result->data[ 2] = -f.x;
+	result->data[ 6] = -f.y;
+	result->data[10] = -f.z;
 
 	result->data[12] = -get_dot_product(&s, eye);
 	result->data[13] = -get_dot_product(&u, eye);
