@@ -17,7 +17,7 @@
 static const uint32_t _DEFAULT_WINDOW_WIDTH = 800;
 static const uint32_t _DEFAULT_WINDOW_HEIGHT = 600;
 
-static const Vector3 _eye = { 0.0f, 0.0f, -1.0f };
+static const Vector3 _eye = { 0.0f, 0.0f, -0.5f };
 static const Vector3 _up = { 0.0f, -1.0f, -1.0f };
 static const Vector3 _look_at = { 0.0f, 0.0f, 0.0f };
 
@@ -920,7 +920,7 @@ static bool _create_graphics_pipeline()
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
 		.depthTestEnable = VK_TRUE,
 		.depthWriteEnable = VK_TRUE,
-		.depthCompareOp = VK_COMPARE_OP_LESS,
+		.depthCompareOp = VK_COMPARE_OP_ALWAYS,
 		.stencilTestEnable = VK_FALSE,
 	};
 
@@ -984,10 +984,10 @@ static bool _create_graphics_pipeline()
 		),
 		.blendEnable = VK_TRUE,
 		.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
-		.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+		.dstColorBlendFactor = VK_BLEND_FACTOR_DST_ALPHA,
 		.colorBlendOp = VK_BLEND_OP_ADD,
 		.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
-		.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+		.dstAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
 		.alphaBlendOp = VK_BLEND_OP_ADD,
 	};
 
@@ -1826,49 +1826,49 @@ void create_particles()
 
 	Particle p0 = {
 		.position = { 0.5f, 0.5f, 0.0f, 1.0f },
-		.color = { 1.0f, 0.0f, 0.0f, 1.0f },
+		.color = { 1.0f, 0.0f, 0.0f, 0.5f },
 	};
 	_particles[0] = p0;
 
 	Particle p1 = {
 		.position = { 0.0f, 0.0f, 0.0f, 1.0f },
-		.color = { 0.0f, 1.0f, 0.0f, 1.0f },
+		.color = { 0.0f, 1.0f, 0.0f, 0.5f },
 	};
 	_particles[1] = p1;
 
 	Particle p2 = {
 		.position = { 0.5f, 0.0f, 0.0f, 1.0f },
-		.color = { 0.0f, 0.0f, 1.0f, 1.0f },
+		.color = { 0.0f, 0.0f, 1.0f, 0.5f },
 	};
 	_particles[2] = p2;
 
 	Particle p3 = {
 		.position = { 0.0f, 0.5f, 0.0f, 1.0f },
-		.color = { 1.0f, 1.0f, 1.0f, 1.0f },
+		.color = { 0.5f, 0.5f, 0.5f, 0.5f },
 	};
 	_particles[3] = p3;
 
 	Particle p4 = {
 		.position = { 0.5f, 0.5f, 0.5f, 1.0f },
-		.color = { 1.0f, 1.0f, 0.0f, 1.0f },
+		.color = { 0.0f, 0.0f, 1.0f, 0.5f },
 	};
 	_particles[4] = p4;
 
 	Particle p5 = {
 		.position = { 0.0f, 0.0f, 0.5f, 1.0f },
-		.color = { 0.0f, 1.0f, 1.0f, 1.0f },
+		.color = { 0.0f, 0.0f, 1.0f, 0.5f },
 	};
 	_particles[5] = p5;
 
 	Particle p6 = {
 		.position = { 0.5f, 0.0f, 0.5f, 1.0f },
-		.color = { 1.0f, 0.0f, 1.0f, 1.0f },
+		.color = { 1.0f, 0.0f, 0.0f, 0.5f },
 	};
 	_particles[6] = p6;
 
 	Particle p7 = {
 		.position = { 0.0f, 0.5f, 0.5f, 1.0f },
-		.color = { 0.7f, 0.2f, 0.1f, 1.0f },
+		.color = { 0.5f, 0.5f, 0.5f, 0.5f },
 	};
 	_particles[7] = p7;
 
@@ -1919,7 +1919,7 @@ void render()
 		Quaternion rotated = get_quaternion(((float)M_PI / 2.0f) * time_diff, &rotation_axis);
 		base = get_multiplied_q(&base, &rotated);
 
-		_uniform_data.model = get_transform(&base);
+//		_uniform_data.model = get_transform(&base);
 
 		draw_success = (
 			_update_uniform_data_buffer() &&
