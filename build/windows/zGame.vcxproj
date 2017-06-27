@@ -183,12 +183,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\src\implementation\windows\dynamic_array.c" />
     <ClCompile Include="..\..\src\implementation\windows\main.c" />
     <ClCompile Include="..\..\src\implementation\windows\math3d.c" />
     <ClCompile Include="..\..\src\implementation\windows\memory_pool.c" />
     <ClCompile Include="..\..\src\implementation\windows\system_bridge.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\src\interface\dynamic_array.h" />
     <ClInclude Include="..\..\src\interface\math3d.h" />
     <ClInclude Include="..\..\src\interface\memory_pool.h" />
     <ClInclude Include="..\..\src\interface\system_bridge.h" />

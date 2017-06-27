@@ -864,8 +864,8 @@ static bool _create_render_pass()
 }
 static bool _create_graphics_pipeline()
 {
-	CHECK_RESULT(_create_shader_module(&_vertex_shader, "../../src/shaders/vertex.spv", _vertex_shader_code));
-	CHECK_RESULT(_create_shader_module(&_fragment_shader, "../../src/shaders/fragment.spv", _fragment_shader_code));
+	CHECK_RESULT(_create_shader_module(&_vertex_shader, "shaders/vertex.spv", _vertex_shader_code));
+	CHECK_RESULT(_create_shader_module(&_fragment_shader, "shaders/fragment.spv", _fragment_shader_code));
 
 	VkPipelineShaderStageCreateInfo vertex_shader_stage_ci = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -1048,7 +1048,7 @@ static bool _create_graphics_pipeline()
 }
 static bool _create_compute_pipeline()
 {
-	CHECK_RESULT(_create_shader_module(&_compute_shader, "../../src/shaders/compute.spv", _compute_shader_code));
+	CHECK_RESULT(_create_shader_module(&_compute_shader, "shaders/compute.spv", _compute_shader_code));
 
 	VkPipelineShaderStageCreateInfo compute_shader_stage_ci = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
