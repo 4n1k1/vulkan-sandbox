@@ -17,9 +17,11 @@
 static const uint32_t _DEFAULT_WINDOW_WIDTH = 800;
 static const uint32_t _DEFAULT_WINDOW_HEIGHT = 600;
 
-static const Vector3 _eye = { 0.0f, 0.0f, -0.5f };
+static const Vector3 _eye = { 0.0f, 0.0f, -1.5f };
 static const Vector3 _up = { 0.0f, -1.0f, -1.0f };
 static const Vector3 _look_at = { 0.0f, 0.0f, 0.0f };
+
+static bool _is_resizing = false;
 
 static Matrix4x4 _projection = {
 	.data = {
@@ -604,7 +606,8 @@ static bool _instance_supports_required_layers()
 	{
 		bool layer_found = false;
 
-		for (uint32_t j = 0; j < supported_layers_num; j += 1) {
+		for (uint32_t j = 0; j < supported_layers_num; j += 1)
+		{
 			if (strcmp(supported_layers[j].layerName, _required_validation_layers.names[i]) == 0) {
 				layer_found = true;
 				break;
@@ -920,7 +923,7 @@ static bool _create_graphics_pipeline()
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
 		.depthTestEnable = VK_TRUE,
 		.depthWriteEnable = VK_TRUE,
-		.depthCompareOp = VK_COMPARE_OP_ALWAYS,
+		.depthCompareOp = VK_COMPARE_OP_LESS,
 		.stencilTestEnable = VK_FALSE,
 	};
 
@@ -982,7 +985,7 @@ static bool _create_graphics_pipeline()
 			VK_COLOR_COMPONENT_B_BIT |
 			VK_COLOR_COMPONENT_A_BIT
 		),
-		.blendEnable = VK_TRUE,
+		.blendEnable = VK_FALSE,
 		.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
 		.dstColorBlendFactor = VK_BLEND_FACTOR_DST_ALPHA,
 		.colorBlendOp = VK_BLEND_OP_ADD,
@@ -1711,18 +1714,20 @@ static bool _draw_frame()
 }
 static void _window_resize_callback(GLFWwindow* window, int width, int height)
 {
+	_is_resizing = true;
+
 	vkDeviceWaitIdle(_device);
 
 	if (
 		_create_swap_chain() &&
+		_create_depth_resources() &&
 		_create_render_pass() &&
 		_create_graphics_pipeline() &&
 		_create_framebuffers() &&
 		_write_image_draw_command_buffers()
 	) {
-		_draw_frame();
-	}
-	else {
+		_is_resizing = false;
+	} else {
 		printf("Failed to resize window.\n");
 
 		glfwSetWindowShouldClose(_window, true);
@@ -1826,49 +1831,49 @@ void create_particles()
 
 	Particle p0 = {
 		.position = { 0.5f, 0.5f, 0.0f, 1.0f },
-		.color = { 1.0f, 0.0f, 0.0f, 0.5f },
+		.color = { 1.0f, 0.0f, 0.0f, 1.0f },
 	};
 	_particles[0] = p0;
 
 	Particle p1 = {
 		.position = { 0.0f, 0.0f, 0.0f, 1.0f },
-		.color = { 0.0f, 1.0f, 0.0f, 0.5f },
+		.color = { 0.0f, 1.0f, 0.0f, 1.0f },
 	};
 	_particles[1] = p1;
 
 	Particle p2 = {
 		.position = { 0.5f, 0.0f, 0.0f, 1.0f },
-		.color = { 0.0f, 0.0f, 1.0f, 0.5f },
+		.color = { 0.0f, 0.0f, 1.0f, 1.0f },
 	};
 	_particles[2] = p2;
 
 	Particle p3 = {
 		.position = { 0.0f, 0.5f, 0.0f, 1.0f },
-		.color = { 0.5f, 0.5f, 0.5f, 0.5f },
+		.color = { 0.5f, 0.5f, 0.5f, 1.0f },
 	};
 	_particles[3] = p3;
 
 	Particle p4 = {
 		.position = { 0.5f, 0.5f, 0.5f, 1.0f },
-		.color = { 0.0f, 0.0f, 1.0f, 0.5f },
+		.color = { 0.0f, 0.0f, 1.0f, 1.0f },
 	};
 	_particles[4] = p4;
 
 	Particle p5 = {
 		.position = { 0.0f, 0.0f, 0.5f, 1.0f },
-		.color = { 0.0f, 0.0f, 1.0f, 0.5f },
+		.color = { 0.0f, 0.0f, 1.0f, 1.0f },
 	};
 	_particles[5] = p5;
 
 	Particle p6 = {
 		.position = { 0.5f, 0.0f, 0.5f, 1.0f },
-		.color = { 1.0f, 0.0f, 0.0f, 0.5f },
+		.color = { 1.0f, 0.0f, 0.0f, 1.0f },
 	};
 	_particles[6] = p6;
 
 	Particle p7 = {
 		.position = { 0.0f, 0.5f, 0.5f, 1.0f },
-		.color = { 0.5f, 0.5f, 0.5f, 0.5f },
+		.color = { 0.5f, 0.5f, 0.5f, 1.0f },
 	};
 	_particles[7] = p7;
 
@@ -1910,7 +1915,7 @@ void render()
 	Vector3 rotation_axis = { .x = 1.0f, .y = 0.0f, .z = 0.0f };
 	Quaternion base = { .x = 0.0f, .y = 0.0f, .z = 0.0f, .w = 1.0f };
 
-	while (!glfwWindowShouldClose(_window) && draw_success)
+	while (!glfwWindowShouldClose(_window) && draw_success && !_is_resizing)
 	{
 		glfwPollEvents();
 
@@ -1919,7 +1924,7 @@ void render()
 		Quaternion rotated = get_quaternion(((float)M_PI / 2.0f) * time_diff, &rotation_axis);
 		base = get_multiplied_q(&base, &rotated);
 
-//		_uniform_data.model = get_transform(&base);
+		_uniform_data.model = get_transform(&base);
 
 		draw_success = (
 			_update_uniform_data_buffer() &&
