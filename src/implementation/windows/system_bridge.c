@@ -21,8 +21,6 @@ static const Vector3 _eye = { 0.0f, 0.0f, -1.5f };
 static const Vector3 _up = { 0.0f, -1.0f, -1.0f };
 static const Vector3 _look_at = { 0.0f, 0.0f, 0.0f };
 
-static bool _is_resizing = false;
-
 static Matrix4x4 _projection = {
 	.data = {
 		1.0f, 0.0f, 0.0f, 0.0f,
@@ -144,7 +142,7 @@ static VkSemaphore _render_finished;
 static Vertices _vertices;
 static Indices _indices;
 static UniformData _uniform_data;
-static Particle *_particles;
+static Particles _particles;
 
 /* Helper functions */
 
@@ -195,7 +193,7 @@ static bool _create_image(VkFormat format, VkImageTiling tiling, VkImageUsageFla
 		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
 	};
 
-	CHECK_VK_RESULT(vkCreateImage(_device, &imageInfo, NULL, image));
+	VK_RETURN_FALSE(vkCreateImage(_device, &imageInfo, NULL, image));
 
 	VkMemoryRequirements memRequirements;
 	vkGetImageMemoryRequirements(_device, *image, &memRequirements);
@@ -218,7 +216,7 @@ static bool _create_image(VkFormat format, VkImageTiling tiling, VkImageUsageFla
 		}
 	}
 
-	CHECK_VK_RESULT(vkAllocateMemory(_device, &allocInfo, NULL, image_memory));
+	VK_RETURN_FALSE(vkAllocateMemory(_device, &allocInfo, NULL, image_memory));
 
 	return vkBindImageMemory(_device, *image, *image_memory, 0) == VK_SUCCESS;
 }
@@ -261,7 +259,7 @@ static bool _find_memory_type(uint32_t *memory_type, uint32_t typeFilter, VkMemo
 */
 static bool _copy_buffer(VkBuffer *dst_buffer, VkBuffer *src_buffer, VkDeviceSize size)
 {
-	CHECK_RESULT(_begin_one_time_command());
+	RETURN_FALSE(_begin_one_time_command());
 
 	VkBufferCopy copy_attrs = { .size = size };
 
@@ -548,7 +546,7 @@ static bool _create_memory_buffer(VkDeviceSize size, VkBufferUsageFlags usage, V
 		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
 	};
 
-	CHECK_VK_RESULT(vkCreateBuffer(_device, &bufferInfo, NULL, buffer));
+	VK_RETURN_FALSE(vkCreateBuffer(_device, &bufferInfo, NULL, buffer));
 
 	VkMemoryRequirements memRequirements;
 	vkGetBufferMemoryRequirements(_device, *buffer, &memRequirements);
@@ -558,8 +556,8 @@ static bool _create_memory_buffer(VkDeviceSize size, VkBufferUsageFlags usage, V
 		.allocationSize = memRequirements.size,
 	};
 
-	CHECK_RESULT(_find_memory_type(&(allocInfo.memoryTypeIndex), memRequirements.memoryTypeBits, properties));
-	CHECK_VK_RESULT(vkAllocateMemory(_device, &allocInfo, NULL, buffer_memory))
+	RETURN_FALSE(_find_memory_type(&(allocInfo.memoryTypeIndex), memRequirements.memoryTypeBits, properties));
+	VK_RETURN_FALSE(vkAllocateMemory(_device, &allocInfo, NULL, buffer_memory))
 
 	return vkBindBufferMemory(_device, *buffer, *buffer_memory, 0) == VK_SUCCESS;
 }
@@ -733,7 +731,7 @@ static bool _create_logical_device()
 		.ppEnabledExtensionNames = _required_physical_device_extensions.names,
 	};
 
-	CHECK_VK_RESULT(vkCreateDevice(_physical_device, &create_info, NULL, &_device));
+	VK_RETURN_FALSE(vkCreateDevice(_physical_device, &create_info, NULL, &_device));
 
 	vkGetDeviceQueue(_device, _operation_queue_families.compute_family_idx, 0, &_compute_queue);
 	vkGetDeviceQueue(_device, _operation_queue_families.graphics_family_idx, 1, &_graphics_queue);
@@ -768,7 +766,7 @@ static bool _create_swap_chain()
 		.clipped = VK_TRUE,
 	};
 
-	CHECK_VK_RESULT(vkCreateSwapchainKHR(_device, &createInfo, NULL, &(_swap_chain)));
+	VK_RETURN_FALSE(vkCreateSwapchainKHR(_device, &createInfo, NULL, &(_swap_chain)));
 
 	vkGetSwapchainImagesKHR(_device, _swap_chain, &(_swap_chain_images.count), NULL);
 
@@ -785,7 +783,7 @@ static bool _create_swap_chain()
 
 	for (uint32_t i = 0; i < _swap_chain_images.count; i++)
 	{
-		CHECK_RESULT(
+		RETURN_FALSE(
 			_create_image_view(
 				_swap_chain_images.data + i,
 				_swap_chain_image_views.data + i,
@@ -864,8 +862,8 @@ static bool _create_render_pass()
 }
 static bool _create_graphics_pipeline()
 {
-	CHECK_RESULT(_create_shader_module(&_vertex_shader, "shaders/vertex.spv", _vertex_shader_code));
-	CHECK_RESULT(_create_shader_module(&_fragment_shader, "shaders/fragment.spv", _fragment_shader_code));
+	RETURN_FALSE(_create_shader_module(&_vertex_shader, "shaders/vertex.spv", _vertex_shader_code));
+	RETURN_FALSE(_create_shader_module(&_fragment_shader, "shaders/fragment.spv", _fragment_shader_code));
 
 	VkPipelineShaderStageCreateInfo vertex_shader_stage_ci = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -1025,7 +1023,7 @@ static bool _create_graphics_pipeline()
 		.pPushConstantRanges = 0, // Optional
 	};
 
-	CHECK_VK_RESULT(vkCreatePipelineLayout(_device, &pipelineLayoutInfo, NULL, &_graphics_pipeline_layout));
+	VK_RETURN_FALSE(vkCreatePipelineLayout(_device, &pipelineLayoutInfo, NULL, &_graphics_pipeline_layout));
 
 	VkGraphicsPipelineCreateInfo pipelineInfo = {
 		.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
@@ -1048,7 +1046,7 @@ static bool _create_graphics_pipeline()
 }
 static bool _create_compute_pipeline()
 {
-	CHECK_RESULT(_create_shader_module(&_compute_shader, "shaders/compute.spv", _compute_shader_code));
+	RETURN_FALSE(_create_shader_module(&_compute_shader, "shaders/compute.spv", _compute_shader_code));
 
 	VkPipelineShaderStageCreateInfo compute_shader_stage_ci = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -1064,7 +1062,7 @@ static bool _create_compute_pipeline()
 		.pSetLayouts = &_descriptor_set_layout,
 	};
 
-	CHECK_VK_RESULT(vkCreatePipelineLayout(_device, &pipeline_layout_ci, NULL, &_compute_pipeline_layout));
+	VK_RETURN_FALSE(vkCreatePipelineLayout(_device, &pipeline_layout_ci, NULL, &_compute_pipeline_layout));
 
 	VkComputePipelineCreateInfo pipeline_ci = {
 		.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
@@ -1077,8 +1075,8 @@ static bool _create_compute_pipeline()
 }
 static bool _create_depth_resources()
 {
-	CHECK_RESULT(_pick_depth_buffer_format());
-	CHECK_RESULT(
+	RETURN_FALSE(_pick_depth_buffer_format());
+	RETURN_FALSE(
 		_create_image(
 			_depth_image_format,
 			VK_IMAGE_TILING_OPTIMAL,
@@ -1090,7 +1088,7 @@ static bool _create_depth_resources()
 		)
 	);
 	
-	CHECK_RESULT(
+	RETURN_FALSE(
 		_create_image_view(
 			&_depth_image,
 			&_depth_image_view,
@@ -1099,7 +1097,7 @@ static bool _create_depth_resources()
 		)
 	);
 
-	CHECK_RESULT(_begin_one_time_command());
+	RETURN_FALSE(_begin_one_time_command());
 
 	VkImageMemoryBarrier barrier = {
 		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -1215,7 +1213,7 @@ static bool _create_descriptor_sets()
 		.descriptorSetCount = 1,
 	};
 
-	CHECK_VK_RESULT(vkAllocateDescriptorSets(_device, &alloc_info, &_descriptor_set));
+	VK_RETURN_FALSE(vkAllocateDescriptorSets(_device, &alloc_info, &_descriptor_set));
 
 	VkDescriptorBufferInfo vertex_buffer_info = {
 		.buffer = _device_vertex_buffer,
@@ -1296,7 +1294,7 @@ static bool _create_uniform_data_buffer()
 {
 	VkDeviceSize buffer_size = sizeof(UniformData);
 
-	CHECK_RESULT(
+	RETURN_FALSE(
 		_create_memory_buffer(
 			buffer_size,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1312,7 +1310,7 @@ static bool _create_uniform_data_buffer()
 	memcpy(data, &_uniform_data, (uint32_t)buffer_size);
 	vkUnmapMemory(_device, _host_uniform_data_buffer_memory);
 
-	CHECK_RESULT(
+	RETURN_FALSE(
 		_create_memory_buffer(
 			buffer_size,
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
@@ -1328,7 +1326,7 @@ static bool _create_vertex_buffer()
 {
 	VkDeviceSize buffer_size = sizeof(Vertex) * _vertices.count;
 
-	CHECK_RESULT(
+	RETURN_FALSE(
 		_create_memory_buffer(
 			buffer_size,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1344,7 +1342,7 @@ static bool _create_vertex_buffer()
 	memcpy(data, _vertices.data, (uint32_t)buffer_size);
 	vkUnmapMemory(_device, _host_vertex_buffer_memory);
 
-	CHECK_RESULT(
+	RETURN_FALSE(
 		_create_memory_buffer(
 			buffer_size,
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -1360,7 +1358,7 @@ static bool _create_index_buffer()
 {
 	VkDeviceSize buffer_size = sizeof(uint32_t) * _indices.count;
 
-	CHECK_RESULT(
+	RETURN_FALSE(
 		_create_memory_buffer(
 			buffer_size,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1376,7 +1374,7 @@ static bool _create_index_buffer()
 	memcpy(data, _indices.data, (uint32_t)buffer_size);
 	vkUnmapMemory(_device, _host_index_buffer_memory);
 
-	CHECK_RESULT(
+	RETURN_FALSE(
 		_create_memory_buffer(
 			buffer_size,
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -1390,9 +1388,9 @@ static bool _create_index_buffer()
 }
 static bool _create_particle_buffer()
 {
-	VkDeviceSize buffer_size = sizeof(Particle) * PARTICLE_COUNT;
+	VkDeviceSize buffer_size = sizeof(Particle) * _particles.count;
 
-	CHECK_RESULT(
+	RETURN_FALSE(
 		_create_memory_buffer(
 			buffer_size,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1405,10 +1403,10 @@ static bool _create_particle_buffer()
 	void* data;
 
 	vkMapMemory(_device, _host_particle_buffer_memory, 0, buffer_size, 0, &data);
-	memcpy(data, _particles, (uint32_t)buffer_size);
+	memcpy(data, _particles.data, (uint32_t)buffer_size);
 	vkUnmapMemory(_device, _host_particle_buffer_memory);
 
-	CHECK_RESULT(
+	RETURN_FALSE(
 		_create_memory_buffer(
 			buffer_size,
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -1442,10 +1440,32 @@ static bool _create_framebuffers()
 			.layers = 1,
 		};
 
-		CHECK_VK_RESULT(vkCreateFramebuffer(_device, &framebufferInfo, NULL, _swap_chain_framebuffers.data + i));
+		VK_RETURN_FALSE(vkCreateFramebuffer(_device, &framebufferInfo, NULL, _swap_chain_framebuffers.data + i));
 	}
 
 	return true;
+}
+static bool _allocate_image_draw_command_buffers()
+{
+	VkCommandBufferAllocateInfo image_draw_cb_ai = {
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+		.commandPool = _long_live_buffers_pool,
+		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.commandBufferCount = _swap_chain_images.count,
+	};
+
+	return vkAllocateCommandBuffers(_device, &image_draw_cb_ai, _command_buffers.data + 1) == VK_SUCCESS;
+}
+static bool _allocate_compute_command_buffer()
+{
+	VkCommandBufferAllocateInfo compute_cb_ai = {
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+		.commandPool = _long_live_buffers_pool,
+		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.commandBufferCount = 1,
+	};
+
+	return vkAllocateCommandBuffers(_device, &compute_cb_ai, _command_buffers.data + 1 + _swap_chain_images.count) == VK_SUCCESS;
 }
 static bool _create_command_pools_and_allocate_buffers()
 {
@@ -1467,15 +1487,8 @@ static bool _create_command_pools_and_allocate_buffers()
 	_command_buffers.count = 2 + _swap_chain_images.count;
 	_command_buffers.data = (VkCommandBuffer*)malloc(sizeof(VkCommandBuffer) * _command_buffers.count);
 
-	CHECK_VK_RESULT(vkCreateCommandPool(_device, &long_live_buffers_pool_ci, NULL, &_long_live_buffers_pool));
-	CHECK_VK_RESULT(vkCreateCommandPool(_device, &one_time_buffers_pool_ci, NULL, &_one_time_buffers_pool));
-
-	VkCommandBufferAllocateInfo logn_live_buffers_ai = {
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.commandPool = _long_live_buffers_pool,
-		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount = _command_buffers.count - 1,
-	};
+	VK_RETURN_FALSE(vkCreateCommandPool(_device, &long_live_buffers_pool_ci, NULL, &_long_live_buffers_pool));
+	VK_RETURN_FALSE(vkCreateCommandPool(_device, &one_time_buffers_pool_ci, NULL, &_one_time_buffers_pool));
 
 	VkCommandBufferAllocateInfo one_time_buffer_ai = {
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -1485,8 +1498,9 @@ static bool _create_command_pools_and_allocate_buffers()
 	};
 
 	return (
-		vkAllocateCommandBuffers(_device, &logn_live_buffers_ai, _command_buffers.data + 1) == VK_SUCCESS &&
-		vkAllocateCommandBuffers(_device, &one_time_buffer_ai, _command_buffers.data) == VK_SUCCESS
+		vkAllocateCommandBuffers(_device, &one_time_buffer_ai, _command_buffers.data) == VK_SUCCESS &&
+		_allocate_image_draw_command_buffers() &&
+		_allocate_compute_command_buffer()
 	);
 }
 static bool _write_image_draw_command_buffers()
@@ -1542,7 +1556,7 @@ static bool _write_image_draw_command_buffers()
 		vkCmdDrawIndexed(_command_buffers.data[idx], _indices.count, 1, 0, 0, 0);
 		vkCmdEndRenderPass(_command_buffers.data[idx]);
 
-		CHECK_VK_RESULT(vkEndCommandBuffer(_command_buffers.data[idx]));
+		VK_RETURN_FALSE(vkEndCommandBuffer(_command_buffers.data[idx]));
 	}
 
 	return true;
@@ -1553,7 +1567,7 @@ static bool _write_compute_command_buffer()
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 	};
 
-	CHECK_VK_RESULT(
+	VK_RETURN_FALSE(
 		vkBeginCommandBuffer(
 			_command_buffers.data[_compute_command_buffer_idx],
 			&beginInfo
@@ -1712,27 +1726,89 @@ static bool _draw_frame()
 
 	return vkQueuePresentKHR(_present_queue, &presentInfo) == VK_SUCCESS;
 }
+
+static void _destroy_swap_chain()
+{
+	for (uint32_t i = 0; i < _swap_chain_framebuffers.count; i += 1)
+	{
+		vkDestroyFramebuffer(_device, _swap_chain_framebuffers.data[i], NULL);
+	}
+
+	free(_swap_chain_framebuffers.data);
+
+	vkFreeCommandBuffers(
+		_device,
+		_long_live_buffers_pool,
+		_swap_chain_images.count,
+		_command_buffers.data + _image_draw_command_buffers_begin_idx
+	);
+
+	vkDestroyPipeline(_device, _graphics_pipeline, NULL);
+	vkDestroyPipelineLayout(_device, _graphics_pipeline_layout, NULL);
+	vkDestroyRenderPass(_device, _render_pass, NULL);
+
+	vkDestroyImageView(_device, _depth_image_view, NULL);
+	vkDestroyImage(_device, _depth_image, NULL);
+	vkFreeMemory(_device, _depth_image_memory, NULL);
+
+	for (uint32_t i = 0; i < _swap_chain_image_views.count; i += 1)
+	{
+		vkDestroyImageView(_device, _swap_chain_image_views.data[i], NULL);
+	}
+
+	free(_swap_chain_image_views.data);
+	free(_swap_chain_images.data);
+
+	vkDestroySwapchainKHR(_device, _swap_chain, NULL);
+}
 static void _window_resize_callback(GLFWwindow* window, int width, int height)
 {
-	_is_resizing = true;
-
 	vkDeviceWaitIdle(_device);
 
-	if (
-		_create_swap_chain() &&
-		_create_depth_resources() &&
-		_create_render_pass() &&
-		_create_graphics_pipeline() &&
-		_create_framebuffers() &&
-		_write_image_draw_command_buffers()
+	_destroy_swap_chain();
+
+	_swap_chain_image_extent.width = width;
+	_swap_chain_image_extent.height = height;
+
+	if (!
+		(
+			_create_swap_chain() &&
+			_create_depth_resources() &&
+			_create_render_pass() &&
+			_create_graphics_pipeline() &&
+			_create_framebuffers() &&
+			_allocate_image_draw_command_buffers() &&
+			_write_image_draw_command_buffers()
+		)
 	) {
-		_is_resizing = false;
-	} else {
 		printf("Failed to resize window.\n");
 
 		glfwSetWindowShouldClose(_window, true);
 	}
 }
+static void _mouse_button_callback(GLFWwindow *window, int mouse_button, int action, int mods)
+{
+	if (mouse_button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+	{
+		double x, y;
+
+		glfwGetCursorPos(window, &x, &y);
+
+		realloc(_particles.data, (_particles.count + 1) * sizeof(Particle));
+
+		Particle new_particle = {
+			.position = { (float)x, (float)y, 0.0f, 1.0f },
+			.color = { 1.0f, 1.0f, 1.0f, 1.0f },
+		};
+
+		_particles.data[_particles.count] = new_particle;
+
+		_particles.count += 1;
+
+		CHECK_FALSE_M(_create_particle_buffer(), "Failed to create particle buffer.");
+	}
+}
+
 static bool _init_window()
 {
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); // don't create OpenGL context
@@ -1746,6 +1822,7 @@ static bool _init_window()
 	}
 
 	glfwSetWindowSizeCallback(_window, _window_resize_callback);
+	glfwSetMouseButtonCallback(_window, _mouse_button_callback);
 
 	return true;
 }
@@ -1768,28 +1845,28 @@ static bool _update_uniform_data_buffer()
 
 bool setup_window_and_gpu()
 {
-	CHECK_GLFW_RESULT_M(glfwInit(), "Failed to initialize GLFW.\n"); // to know which extensions GLFW requires
+	GLFW_RETURN_FALSE_M(glfwInit(), "Failed to initialize GLFW."); // to know which extensions GLFW requires
 
 	_setup_required_extensions();
 
-	CHECK_RESULT_M(_instance_supports_required_extensions(), "Some extensions are not supported.");
+	RETURN_FALSE_M(_instance_supports_required_extensions(), "Some extensions are not supported.");
 
 #ifdef _DEBUG
 	_required_validation_layers.names = (char**)malloc(sizeof(char*) * VALIDATION_LAYERS_COUNT);
 	_required_validation_layers.names[0] = "VK_LAYER_LUNARG_standard_validation";
 	_required_validation_layers.count = VALIDATION_LAYERS_COUNT;
 
-	CHECK_RESULT_M(_instance_supports_required_layers(), "Validation layers are not supported.")
+	RETURN_FALSE_M(_instance_supports_required_layers(), "Validation layers are not supported.")
 #endif
 
-	CHECK_RESULT_M(_create_instance(), "Failed to create instance.");
+	RETURN_FALSE_M(_create_instance(), "Failed to create instance.");
 
 #ifdef _DEBUG
-	CHECK_RESULT_M(_setup_debug_callback(), "Failed to set up debug callback.");
+	RETURN_FALSE_M(_setup_debug_callback(), "Failed to set up debug callback.");
 #endif
 
-	CHECK_RESULT_M(_init_window(), "Failed to init window.");
-	CHECK_VK_RESULT_M(
+	RETURN_FALSE_M(_init_window(), "Failed to init window.");
+	VK_RETURN_FALSE_M(
 		glfwCreateWindowSurface(_instance, _window, NULL, &(_surface)),
 		"Failed to create surface."
 	);
@@ -1798,84 +1875,85 @@ bool setup_window_and_gpu()
 	_required_physical_device_extensions.names[0] = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
 	_required_physical_device_extensions.count = PHYSICAL_DEVICE_EXTENSIONS_COUNT;
 
-	CHECK_RESULT_M(_pick_physical_device(), "Failed to find suitable GPU.");
-	CHECK_RESULT_M(_create_logical_device(), "Failed to create logical device.");
-	CHECK_RESULT_M(_create_swap_chain(), "Failed to create swap chain.");
-	CHECK_RESULT_M(
+	RETURN_FALSE_M(_pick_physical_device(), "Failed to find suitable GPU.");
+	RETURN_FALSE_M(_create_logical_device(), "Failed to create logical device.");
+	RETURN_FALSE_M(_create_swap_chain(), "Failed to create swap chain.");
+	RETURN_FALSE_M(
 		_create_command_pools_and_allocate_buffers(),
 		"Failed to create command pool or allocate buffers."
 	);
-	CHECK_RESULT_M(_create_depth_resources(), "Failed to create depth resources.");
-	CHECK_RESULT_M(_create_vertex_buffer(), "Failed to create vertex buffer.");
-	CHECK_RESULT_M(_create_index_buffer(), "Failed to create index buffer.");
-	CHECK_RESULT_M(_create_particle_buffer(), "Failed to create particle buffer.");
-	CHECK_RESULT_M(_create_uniform_data_buffer(), "Failed to create uniform data buffer.");
-	CHECK_RESULT_M(_create_descriptor_pool(), "Failed to create descriptor pool.");
-	CHECK_RESULT_M(_create_descriptor_set_layout(), "Failed to create descriptor set layout.");
-	CHECK_RESULT_M(_create_descriptor_sets(), "Failed to allocate descriptor sets.");
-	CHECK_RESULT_M(_create_render_pass(), "Failed to create render pass.");
-	CHECK_RESULT_M(_create_compute_pipeline(), "Failed to create compute pipeline.");
-	CHECK_RESULT_M(_create_compute_finished_fence(), "Failed to create compute finished fence.");
-	CHECK_RESULT_M(_create_graphics_pipeline(), "Failed to create graphics pipeline.");
-	CHECK_RESULT_M(_create_framebuffers(), "Failed to create swap chain framebuffers.");
-	CHECK_RESULT_M(_create_semaphores(), "Failed to create semaphores.");
-	CHECK_RESULT_M(_write_image_draw_command_buffers(), "Couldn't write draw commands.");
-	CHECK_RESULT_M(_write_compute_command_buffer(), "Couldn't write compute commands.");
+	RETURN_FALSE_M(_create_depth_resources(), "Failed to create depth resources.");
+	RETURN_FALSE_M(_create_vertex_buffer(), "Failed to create vertex buffer.");
+	RETURN_FALSE_M(_create_index_buffer(), "Failed to create index buffer.");
+	RETURN_FALSE_M(_create_particle_buffer(), "Failed to create particle buffer.");
+	RETURN_FALSE_M(_create_uniform_data_buffer(), "Failed to create uniform data buffer.");
+	RETURN_FALSE_M(_create_descriptor_pool(), "Failed to create descriptor pool.");
+	RETURN_FALSE_M(_create_descriptor_set_layout(), "Failed to create descriptor set layout.");
+	RETURN_FALSE_M(_create_descriptor_sets(), "Failed to allocate descriptor sets.");
+	RETURN_FALSE_M(_create_render_pass(), "Failed to create render pass.");
+	RETURN_FALSE_M(_create_compute_pipeline(), "Failed to create compute pipeline.");
+	RETURN_FALSE_M(_create_compute_finished_fence(), "Failed to create compute finished fence.");
+	RETURN_FALSE_M(_create_graphics_pipeline(), "Failed to create graphics pipeline.");
+	RETURN_FALSE_M(_create_framebuffers(), "Failed to create swap chain framebuffers.");
+	RETURN_FALSE_M(_create_semaphores(), "Failed to create semaphores.");
+	RETURN_FALSE_M(_write_image_draw_command_buffers(), "Couldn't write draw commands.");
+	RETURN_FALSE_M(_write_compute_command_buffer(), "Couldn't write compute commands.");
 
 	return true;
 }
 
 void create_particles()
 {
-	_particles = (Particle*)malloc(sizeof(Particle) * PARTICLE_COUNT);
+	_particles.data = (Particle*)malloc(sizeof(Particle) * PARTICLE_COUNT);
+	_particles.count = PARTICLE_COUNT;
 
 	Particle p0 = {
 		.position = { 0.5f, 0.5f, 0.0f, 1.0f },
 		.color = { 1.0f, 0.0f, 0.0f, 1.0f },
 	};
-	_particles[0] = p0;
+	_particles.data[0] = p0;
 
 	Particle p1 = {
 		.position = { 0.0f, 0.0f, 0.0f, 1.0f },
 		.color = { 0.0f, 1.0f, 0.0f, 1.0f },
 	};
-	_particles[1] = p1;
+	_particles.data[1] = p1;
 
 	Particle p2 = {
 		.position = { 0.5f, 0.0f, 0.0f, 1.0f },
 		.color = { 0.0f, 0.0f, 1.0f, 1.0f },
 	};
-	_particles[2] = p2;
+	_particles.data[2] = p2;
 
 	Particle p3 = {
 		.position = { 0.0f, 0.5f, 0.0f, 1.0f },
 		.color = { 0.5f, 0.5f, 0.5f, 1.0f },
 	};
-	_particles[3] = p3;
+	_particles.data[3] = p3;
 
 	Particle p4 = {
 		.position = { 0.5f, 0.5f, 0.5f, 1.0f },
 		.color = { 0.0f, 0.0f, 1.0f, 1.0f },
 	};
-	_particles[4] = p4;
+	_particles.data[4] = p4;
 
 	Particle p5 = {
 		.position = { 0.0f, 0.0f, 0.5f, 1.0f },
 		.color = { 0.0f, 0.0f, 1.0f, 1.0f },
 	};
-	_particles[5] = p5;
+	_particles.data[5] = p5;
 
 	Particle p6 = {
 		.position = { 0.5f, 0.0f, 0.5f, 1.0f },
 		.color = { 1.0f, 0.0f, 0.0f, 1.0f },
 	};
-	_particles[6] = p6;
+	_particles.data[6] = p6;
 
 	Particle p7 = {
 		.position = { 0.0f, 0.5f, 0.5f, 1.0f },
 		.color = { 0.5f, 0.5f, 0.5f, 1.0f },
 	};
-	_particles[7] = p7;
+	_particles.data[7] = p7;
 
 	_vertices.count = PARTICLE_COUNT * 4;
 	_vertices.data = (Vertex*)malloc(sizeof(Vertex) * _vertices.count);
@@ -1902,7 +1980,7 @@ void create_particles()
 }
 void destroy_particles()
 {
-	free(_particles);
+	free(_particles.data);
 	free(_vertices.data);
 	free(_indices.data);
 }
@@ -1915,7 +1993,7 @@ void render()
 	Vector3 rotation_axis = { .x = 1.0f, .y = 0.0f, .z = 0.0f };
 	Quaternion base = { .x = 0.0f, .y = 0.0f, .z = 0.0f, .w = 1.0f };
 
-	while (!glfwWindowShouldClose(_window) && draw_success && !_is_resizing)
+	while (!glfwWindowShouldClose(_window) && draw_success)
 	{
 		glfwPollEvents();
 
@@ -1963,45 +2041,40 @@ void destroy_window_and_free_gpu()
 	vkDestroyBuffer(_device, _device_index_buffer, NULL);
 	vkFreeMemory(_device, _device_index_buffer_memory, NULL);
 
-	vkDestroyCommandPool(_device, _long_live_buffers_pool, NULL);
-	vkDestroyCommandPool(_device, _one_time_buffers_pool, NULL);
-
 	vkDestroyFence(_device, _compute_finished_fence, NULL);
 	vkDestroySemaphore(_device, _image_available, NULL);
 	vkDestroySemaphore(_device, _render_finished, NULL);
+
+	vkDestroyShaderModule(_device, _vertex_shader, NULL);
+	vkDestroyShaderModule(_device, _fragment_shader, NULL);
+	vkDestroyShaderModule(_device, _compute_shader, NULL);
 
 	free(_vertex_shader_code);
 	free(_fragment_shader_code);
 	free(_compute_shader_code);
 
-	for (uint32_t i = 0; i < _swap_chain_framebuffers.count; i += 1)
-	{
-		vkDestroyFramebuffer(_device, _swap_chain_framebuffers.data[i], NULL);
-	}
-
-	free(_swap_chain_framebuffers.data);
-	
-	vkDestroyImageView(_device, _depth_image_view, NULL);
-	vkDestroyImage(_device, _depth_image, NULL);
-	vkFreeMemory(_device, _depth_image_memory, NULL);
-	vkDestroyShaderModule(_device, _vertex_shader, NULL);
-	vkDestroyShaderModule(_device, _fragment_shader, NULL);
-	vkDestroyShaderModule(_device, _compute_shader, NULL);
 	vkDestroyPipeline(_device, _compute_pipeline, NULL);
 	vkDestroyPipelineLayout(_device, _compute_pipeline_layout, NULL);
-	vkDestroyPipeline(_device, _graphics_pipeline, NULL);
-	vkDestroyPipelineLayout(_device, _graphics_pipeline_layout, NULL);
-	vkDestroyRenderPass(_device, _render_pass, NULL);
 
-	for (uint32_t i = 0; i < _swap_chain_image_views.count; i += 1)
-	{
-		vkDestroyImageView(_device, _swap_chain_image_views.data[i], NULL);
-	}
+	vkFreeCommandBuffers(
+		_device,
+		_one_time_buffers_pool,
+		1,
+		_command_buffers.data
+	);
 
-	free(_swap_chain_image_views.data);
-	free(_swap_chain_images.data);
+	vkFreeCommandBuffers(
+		_device,
+		_long_live_buffers_pool,
+		1,
+		_command_buffers.data + _compute_command_buffer_idx
+	);
 
-	vkDestroySwapchainKHR(_device, _swap_chain, NULL);
+	_destroy_swap_chain();
+
+	vkDestroyCommandPool(_device, _long_live_buffers_pool, NULL);
+	vkDestroyCommandPool(_device, _one_time_buffers_pool, NULL);
+
 	vkDestroyDevice(_device, NULL);
 
 	free(_surface_formats.data);

@@ -9,7 +9,7 @@
 #include "math3d.h"
 
 #define VK_FLAGS_NONE 0
-#define CHECK_VK_RESULT(action) \
+#define VK_RETURN_FALSE(action) \
 {                               \
 	if (VK_SUCCESS != (action)) \
 	{                           \
@@ -17,7 +17,7 @@
 	}                           \
 }
 
-#define CHECK_VK_RESULT_M(action, message) \
+#define VK_RETURN_FALSE_M(action, message) \
 {                                          \
 	if (VK_SUCCESS != (action))            \
 	{                                      \
@@ -26,7 +26,15 @@
 	}                                      \
 }
 
-#define CHECK_RESULT(action) \
+#define CHECK_FALSE_M(action, message) \
+{                                      \
+	if (VK_SUCCESS != (action))        \
+	{                                  \
+		printf("%s\n", message);       \
+	}                                  \
+}
+
+#define RETURN_FALSE(action) \
 {                            \
 	if (!(action))           \
 	{                        \
@@ -34,7 +42,7 @@
 	}                        \
 }
 
-#define CHECK_RESULT_M(action, message) \
+#define RETURN_FALSE_M(action, message) \
 {                                       \
 	if (!(action))                      \
 	{                                   \
@@ -43,7 +51,7 @@
 	}                                   \
 }
 
-#define CHECK_GLFW_RESULT_M(action, message) \
+#define GLFW_RETURN_FALSE_M(action, message) \
 {                                            \
 	if (GLFW_TRUE != (action))               \
 	{                                        \
@@ -148,6 +156,13 @@ typedef struct Particle
 	Color color;
 
 } Particle;
+
+typedef struct Particles
+{
+	Particle *data;
+	uint32_t count;
+
+} Particles;
 
 typedef struct UniformData
 {
