@@ -9,55 +9,55 @@
 #include "math3d.h"
 
 #define VK_FLAGS_NONE 0
-#define VK_RETURN_FALSE(action) \
-{                               \
+#define VK_RETURN_FALSE(action)     \
+{                                   \
 	if (VK_SUCCESS != (action)) \
 	{                           \
-		return false;           \
+		return false;       \
 	}                           \
 }
 
 #define VK_RETURN_FALSE_M(action, message) \
 {                                          \
-	if (VK_SUCCESS != (action))            \
-	{                                      \
-		printf("%s\n", message);           \
-		return false;                      \
-	}                                      \
-}
-
-#define CHECK_FALSE_M(action, message) \
-{                                      \
 	if (VK_SUCCESS != (action))        \
 	{                                  \
-		printf("%s\n", message);       \
+		printf("%s\n", message);   \
+		return false;              \
 	}                                  \
 }
 
-#define RETURN_FALSE(action) \
-{                            \
+#define CHECK_FALSE_M(action, message)     \
+{                                          \
+	if (VK_SUCCESS != (action))        \
+	{                                  \
+		printf("%s\n", message);   \
+	}                                  \
+}
+
+#define RETURN_FALSE(action)     \
+{                                \
 	if (!(action))           \
 	{                        \
-		return false;        \
+		return false;    \
 	}                        \
 }
 
-#define RETURN_FALSE_M(action, message) \
-{                                       \
+#define RETURN_FALSE_M(action, message)     \
+{                                           \
 	if (!(action))                      \
 	{                                   \
-		printf("%s\n", message);        \
-		return false;                   \
+		printf("%s\n", message);    \
+		return false;               \
 	}                                   \
 }
 
 #define GLFW_RETURN_FALSE_M(action, message) \
 {                                            \
-	if (GLFW_TRUE != (action))               \
-	{                                        \
-		printf("%s\n", message);             \
-		return false;                        \
-	}                                        \
+	if (GLFW_TRUE != (action))           \
+	{                                    \
+		printf("%s\n", message);     \
+		return false;                \
+	}                                    \
 }
 
 typedef struct Extensions

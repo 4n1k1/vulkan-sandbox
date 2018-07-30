@@ -1,4 +1,5 @@
 *.spv
+*.swp
 
 .vs/
 build/windows/.vs/
@@ -7,3 +8,5 @@ build/windows/x86/
 build/windows/zGame.VC.VC.opendb
 build/windows/zGame.VC.db
 build/windows/zGame.log
+build/linux/debug
+build/linux/release
