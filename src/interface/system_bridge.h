@@ -9,55 +9,33 @@
 #include "math3d.h"
 
 #define VK_FLAGS_NONE 0
-#define VK_RETURN_FALSE(action)     \
-{                                   \
-	if (VK_SUCCESS != (action)) \
-	{                           \
-		return false;       \
-	}                           \
-}
 
-#define VK_RETURN_FALSE_M(action, message) \
-{                                          \
-	if (VK_SUCCESS != (action))        \
-	{                                  \
-		printf("%s\n", message);   \
-		return false;              \
-	}                                  \
+#ifdef _DEBUG
+#define PROCESS_VK_RESULT(vk_result)                                         \
+{                                                                            \
+	if (VK_SUCCESS != (vk_result))                                       \
+	{                                                                    \
+		printf(__FILE__ ":__LINE__" ": %s\n", _vk_strerror(vk_result)); \
+		return false;                                                \
+	}                                                                    \
 }
-
-#define CHECK_FALSE_M(action, message)     \
-{                                          \
-	if (VK_SUCCESS != (action))        \
-	{                                  \
-		printf("%s\n", message);   \
-	}                                  \
+#else
+#define PROCESS_VK_RESULT(vk_result)                                        \
+{                                                                           \
+	if (VK_SUCCESS != (vk_result))                                      \
+	{                                                                   \
+		return false;                                               \
+	}                                                                   \
 }
+#endif
 
-#define RETURN_FALSE(action)     \
+
+#define PROCESS_RESULT(result)   \
 {                                \
-	if (!(action))           \
+	if (!(result))           \
 	{                        \
 		return false;    \
 	}                        \
-}
-
-#define RETURN_FALSE_M(action, message)     \
-{                                           \
-	if (!(action))                      \
-	{                                   \
-		printf("%s\n", message);    \
-		return false;               \
-	}                                   \
-}
-
-#define GLFW_RETURN_FALSE_M(action, message) \
-{                                            \
-	if (GLFW_TRUE != (action))           \
-	{                                    \
-		printf("%s\n", message);     \
-		return false;                \
-	}                                    \
 }
 
 typedef struct Extensions

@@ -144,8 +144,69 @@ static Indices _indices;
 static UniformData _uniform_data;
 static Particles _particles;
 
+static char _vk_result_message[256];
+
 /* Helper functions */
 
+static char* _vk_strerror(VkResult result)
+{
+	if (result == VK_NOT_READY)
+		strcpy(_vk_result_message, "A fence or query has not yet completed.");
+	if (result == VK_TIMEOUT)
+		strcpy(_vk_result_message, "A wait operation has not completed in the specified time.");
+	if (result == VK_EVENT_SET)
+		strcpy(_vk_result_message, "An event is signaled.");
+	if (result == VK_EVENT_RESET)
+		strcpy(_vk_result_message, "An event is unsignaled.");
+	if (result == VK_INCOMPLETE)
+		strcpy(_vk_result_message, "A return array was too small for the result.");
+	if (result == VK_SUBOPTIMAL_KHR)
+		strcpy(_vk_result_message, "A swapchain no longer matches the surface properties exactly, but can still be used to present to the surface successfully.");
+	if (result == VK_ERROR_OUT_OF_HOST_MEMORY)
+		strcpy(_vk_result_message, "A host memory allocation has failed.");
+	if (result == VK_ERROR_OUT_OF_DEVICE_MEMORY)
+		strcpy(_vk_result_message, "A device memory allocation has failed.");
+	if (result == VK_ERROR_INITIALIZATION_FAILED)
+		strcpy(_vk_result_message, "Initialization of an object could not be completed for implementation-specific reasons.");
+	if (result == VK_ERROR_DEVICE_LOST)
+		strcpy(_vk_result_message, "The logical or physical device has been lost.");
+	if (result == VK_ERROR_MEMORY_MAP_FAILED)
+		strcpy(_vk_result_message, "Mapping of a memory object has failed.");
+	if (result == VK_ERROR_LAYER_NOT_PRESENT)
+		strcpy(_vk_result_message, "A requested layer is not present or could not be loaded.");
+	if (result == VK_ERROR_EXTENSION_NOT_PRESENT)
+		strcpy(_vk_result_message, "A requested extension is not supported.");
+	if (result == VK_ERROR_FEATURE_NOT_PRESENT)
+		strcpy(_vk_result_message, "A requested feature is not supported.");
+	if (result == VK_ERROR_INCOMPATIBLE_DRIVER)
+		strcpy(_vk_result_message, "The requested version of Vulkan is not supported by the driver or is otherwise incompatible for implementation-specific reasons.");
+	if (result == VK_ERROR_TOO_MANY_OBJECTS)
+		strcpy(_vk_result_message, "Too many objects of the type have already been created.");
+	if (result == VK_ERROR_FORMAT_NOT_SUPPORTED)
+		strcpy(_vk_result_message, "A requested format is not supported on this device.");
+	if (result == VK_ERROR_FRAGMENTED_POOL)
+		strcpy(_vk_result_message, "A pool allocation has failed due to fragmentation of the pool’s memory.");
+	if (result == VK_ERROR_SURFACE_LOST_KHR)
+		strcpy(_vk_result_message, "A surface is no longer available.");
+	if (result == VK_ERROR_NATIVE_WINDOW_IN_USE_KHR)
+		strcpy(_vk_result_message, "The requested window is already in use by Vulkan or another API in a manner which prevents it from being used again.");
+	if (result == VK_ERROR_OUT_OF_DATE_KHR)
+		strcpy(_vk_result_message, "A surface has changed in such a way that it is no longer compatible with the swapchain, and further presentation requests using the swapchain will fail.");
+	if (result == VK_ERROR_INCOMPATIBLE_DISPLAY_KHR)
+		strcpy(_vk_result_message, "The display used by a swapchain does not use the same presentable image layout, or is incompatible in a way that prevents sharing an image.");
+	if (result == VK_ERROR_INVALID_SHADER_NV)
+		strcpy(_vk_result_message, "One or more shaders failed to compile or link.");
+	if (result == VK_ERROR_OUT_OF_POOL_MEMORY)
+		strcpy(_vk_result_message, "A pool memory allocation has failed.");
+	if (result == VK_ERROR_INVALID_EXTERNAL_HANDLE)
+		strcpy(_vk_result_message, "An external handle is not a valid handle of the specified type.");
+	if (result == VK_ERROR_FRAGMENTATION_EXT)
+		strcpy(_vk_result_message, "A descriptor pool creation has failed due to fragmentation.");
+	else
+		strcpy(_vk_result_message, "Unknown operation result.");
+
+	return _vk_result_message;
+}
 static bool _begin_one_time_command()
 {
 	VkCommandBufferBeginInfo beginInfo = {
@@ -193,7 +254,7 @@ static bool _create_image(VkFormat format, VkImageTiling tiling, VkImageUsageFla
 		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
 	};
 
-	VK_RETURN_FALSE(vkCreateImage(_device, &imageInfo, NULL, image));
+	PROCESS_VK_RESULT(vkCreateImage(_device, &imageInfo, NULL, image));
 
 	VkMemoryRequirements memRequirements;
 	vkGetImageMemoryRequirements(_device, *image, &memRequirements);
@@ -216,7 +277,7 @@ static bool _create_image(VkFormat format, VkImageTiling tiling, VkImageUsageFla
 		}
 	}
 
-	VK_RETURN_FALSE(vkAllocateMemory(_device, &allocInfo, NULL, image_memory));
+	PROCESS_VK_RESULT(vkAllocateMemory(_device, &allocInfo, NULL, image_memory));
 
 	return vkBindImageMemory(_device, *image, *image_memory, 0) == VK_SUCCESS;
 }
@@ -259,7 +320,7 @@ static bool _find_memory_type(uint32_t *memory_type, uint32_t typeFilter, VkMemo
 */
 static bool _copy_buffer(VkBuffer *dst_buffer, VkBuffer *src_buffer, VkDeviceSize size)
 {
-	RETURN_FALSE(_begin_one_time_command());
+	PROCESS_RESULT(_begin_one_time_command());
 
 	VkBufferCopy copy_attrs = { .size = size };
 
@@ -546,7 +607,7 @@ static bool _create_memory_buffer(VkDeviceSize size, VkBufferUsageFlags usage, V
 		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
 	};
 
-	VK_RETURN_FALSE(vkCreateBuffer(_device, &bufferInfo, NULL, buffer));
+	PROCESS_VK_RESULT(vkCreateBuffer(_device, &bufferInfo, NULL, buffer));
 
 	VkMemoryRequirements memRequirements;
 	vkGetBufferMemoryRequirements(_device, *buffer, &memRequirements);
@@ -556,8 +617,8 @@ static bool _create_memory_buffer(VkDeviceSize size, VkBufferUsageFlags usage, V
 		.allocationSize = memRequirements.size,
 	};
 
-	RETURN_FALSE(_find_memory_type(&(allocInfo.memoryTypeIndex), memRequirements.memoryTypeBits, properties));
-	VK_RETURN_FALSE(vkAllocateMemory(_device, &allocInfo, NULL, buffer_memory))
+	PROCESS_RESULT(_find_memory_type(&(allocInfo.memoryTypeIndex), memRequirements.memoryTypeBits, properties));
+	PROCESS_VK_RESULT(vkAllocateMemory(_device, &allocInfo, NULL, buffer_memory))
 
 	return vkBindBufferMemory(_device, *buffer, *buffer_memory, 0) == VK_SUCCESS;
 }
@@ -731,7 +792,7 @@ static bool _create_logical_device()
 		.ppEnabledExtensionNames = _required_physical_device_extensions.names,
 	};
 
-	VK_RETURN_FALSE(vkCreateDevice(_physical_device, &create_info, NULL, &_device));
+	PROCESS_VK_RESULT(vkCreateDevice(_physical_device, &create_info, NULL, &_device));
 
 	vkGetDeviceQueue(_device, _operation_queue_families.compute_family_idx, 0, &_compute_queue);
 	vkGetDeviceQueue(_device, _operation_queue_families.graphics_family_idx, 1, &_graphics_queue);
@@ -766,7 +827,7 @@ static bool _create_swap_chain()
 		.clipped = VK_TRUE,
 	};
 
-	VK_RETURN_FALSE(vkCreateSwapchainKHR(_device, &createInfo, NULL, &(_swap_chain)));
+	PROCESS_VK_RESULT(vkCreateSwapchainKHR(_device, &createInfo, NULL, &(_swap_chain)));
 
 	vkGetSwapchainImagesKHR(_device, _swap_chain, &(_swap_chain_images.count), NULL);
 
@@ -783,7 +844,7 @@ static bool _create_swap_chain()
 
 	for (uint32_t i = 0; i < _swap_chain_images.count; i++)
 	{
-		RETURN_FALSE(
+		PROCESS_RESULT(
 			_create_image_view(
 				_swap_chain_images.data + i,
 				_swap_chain_image_views.data + i,
@@ -862,8 +923,8 @@ static bool _create_render_pass()
 }
 static bool _create_graphics_pipeline()
 {
-	RETURN_FALSE(_create_shader_module(&_vertex_shader, "vertex.spv", _vertex_shader_code));
-	RETURN_FALSE(_create_shader_module(&_fragment_shader, "fragment.spv", _fragment_shader_code));
+	PROCESS_RESULT(_create_shader_module(&_vertex_shader, "vertex.spv", _vertex_shader_code));
+	PROCESS_RESULT(_create_shader_module(&_fragment_shader, "fragment.spv", _fragment_shader_code));
 
 	VkPipelineShaderStageCreateInfo vertex_shader_stage_ci = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -1023,7 +1084,7 @@ static bool _create_graphics_pipeline()
 		.pPushConstantRanges = 0, // Optional
 	};
 
-	VK_RETURN_FALSE(vkCreatePipelineLayout(_device, &pipelineLayoutInfo, NULL, &_graphics_pipeline_layout));
+	PROCESS_VK_RESULT(vkCreatePipelineLayout(_device, &pipelineLayoutInfo, NULL, &_graphics_pipeline_layout));
 
 	VkGraphicsPipelineCreateInfo pipelineInfo = {
 		.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
@@ -1046,7 +1107,7 @@ static bool _create_graphics_pipeline()
 }
 static bool _create_compute_pipeline()
 {
-	RETURN_FALSE(_create_shader_module(&_compute_shader, "compute.spv", _compute_shader_code));
+	PROCESS_RESULT(_create_shader_module(&_compute_shader, "compute.spv", _compute_shader_code));
 
 	VkPipelineShaderStageCreateInfo compute_shader_stage_ci = {
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -1062,7 +1123,7 @@ static bool _create_compute_pipeline()
 		.pSetLayouts = &_descriptor_set_layout,
 	};
 
-	VK_RETURN_FALSE(vkCreatePipelineLayout(_device, &pipeline_layout_ci, NULL, &_compute_pipeline_layout));
+	PROCESS_VK_RESULT(vkCreatePipelineLayout(_device, &pipeline_layout_ci, NULL, &_compute_pipeline_layout));
 
 	VkComputePipelineCreateInfo pipeline_ci = {
 		.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
@@ -1075,8 +1136,8 @@ static bool _create_compute_pipeline()
 }
 static bool _create_depth_resources()
 {
-	RETURN_FALSE(_pick_depth_buffer_format());
-	RETURN_FALSE(
+	PROCESS_RESULT(_pick_depth_buffer_format());
+	PROCESS_RESULT(
 		_create_image(
 			_depth_image_format,
 			VK_IMAGE_TILING_OPTIMAL,
@@ -1088,7 +1149,7 @@ static bool _create_depth_resources()
 		)
 	);
 	
-	RETURN_FALSE(
+	PROCESS_RESULT(
 		_create_image_view(
 			&_depth_image,
 			&_depth_image_view,
@@ -1097,7 +1158,7 @@ static bool _create_depth_resources()
 		)
 	);
 
-	RETURN_FALSE(_begin_one_time_command());
+	PROCESS_RESULT(_begin_one_time_command());
 
 	VkImageMemoryBarrier barrier = {
 		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -1213,7 +1274,7 @@ static bool _create_descriptor_sets()
 		.descriptorSetCount = 1,
 	};
 
-	VK_RETURN_FALSE(vkAllocateDescriptorSets(_device, &alloc_info, &_descriptor_set));
+	PROCESS_VK_RESULT(vkAllocateDescriptorSets(_device, &alloc_info, &_descriptor_set));
 
 	VkDescriptorBufferInfo vertex_buffer_info = {
 		.buffer = _device_vertex_buffer,
@@ -1294,7 +1355,7 @@ static bool _create_uniform_data_buffer()
 {
 	VkDeviceSize buffer_size = sizeof(UniformData);
 
-	RETURN_FALSE(
+	PROCESS_RESULT(
 		_create_memory_buffer(
 			buffer_size,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1310,7 +1371,7 @@ static bool _create_uniform_data_buffer()
 	memcpy(data, &_uniform_data, (uint32_t)buffer_size);
 	vkUnmapMemory(_device, _host_uniform_data_buffer_memory);
 
-	RETURN_FALSE(
+	PROCESS_RESULT(
 		_create_memory_buffer(
 			buffer_size,
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
@@ -1326,7 +1387,7 @@ static bool _create_vertex_buffer()
 {
 	VkDeviceSize buffer_size = sizeof(Vertex) * _vertices.count;
 
-	RETURN_FALSE(
+	PROCESS_RESULT(
 		_create_memory_buffer(
 			buffer_size,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1342,7 +1403,7 @@ static bool _create_vertex_buffer()
 	memcpy(data, _vertices.data, (uint32_t)buffer_size);
 	vkUnmapMemory(_device, _host_vertex_buffer_memory);
 
-	RETURN_FALSE(
+	PROCESS_RESULT(
 		_create_memory_buffer(
 			buffer_size,
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -1358,7 +1419,7 @@ static bool _create_index_buffer()
 {
 	VkDeviceSize buffer_size = sizeof(uint32_t) * _indices.count;
 
-	RETURN_FALSE(
+	PROCESS_RESULT(
 		_create_memory_buffer(
 			buffer_size,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1374,7 +1435,7 @@ static bool _create_index_buffer()
 	memcpy(data, _indices.data, (uint32_t)buffer_size);
 	vkUnmapMemory(_device, _host_index_buffer_memory);
 
-	RETURN_FALSE(
+	PROCESS_RESULT(
 		_create_memory_buffer(
 			buffer_size,
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -1390,7 +1451,7 @@ static bool _create_particle_buffer()
 {
 	VkDeviceSize buffer_size = sizeof(Particle) * _particles.count;
 
-	RETURN_FALSE(
+	PROCESS_RESULT(
 		_create_memory_buffer(
 			buffer_size,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -1406,7 +1467,7 @@ static bool _create_particle_buffer()
 	memcpy(data, _particles.data, (uint32_t)buffer_size);
 	vkUnmapMemory(_device, _host_particle_buffer_memory);
 
-	RETURN_FALSE(
+	PROCESS_RESULT(
 		_create_memory_buffer(
 			buffer_size,
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
@@ -1440,7 +1501,7 @@ static bool _create_framebuffers()
 			.layers = 1,
 		};
 
-		VK_RETURN_FALSE(vkCreateFramebuffer(_device, &framebufferInfo, NULL, _swap_chain_framebuffers.data + i));
+		PROCESS_VK_RESULT(vkCreateFramebuffer(_device, &framebufferInfo, NULL, _swap_chain_framebuffers.data + i));
 	}
 
 	return true;
@@ -1487,8 +1548,8 @@ static bool _create_command_pools_and_allocate_buffers()
 	_command_buffers.count = 2 + _swap_chain_images.count;
 	_command_buffers.data = (VkCommandBuffer*)malloc(sizeof(VkCommandBuffer) * _command_buffers.count);
 
-	VK_RETURN_FALSE(vkCreateCommandPool(_device, &long_live_buffers_pool_ci, NULL, &_long_live_buffers_pool));
-	VK_RETURN_FALSE(vkCreateCommandPool(_device, &one_time_buffers_pool_ci, NULL, &_one_time_buffers_pool));
+	PROCESS_VK_RESULT(vkCreateCommandPool(_device, &long_live_buffers_pool_ci, NULL, &_long_live_buffers_pool));
+	PROCESS_VK_RESULT(vkCreateCommandPool(_device, &one_time_buffers_pool_ci, NULL, &_one_time_buffers_pool));
 
 	VkCommandBufferAllocateInfo one_time_buffer_ai = {
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -1556,7 +1617,7 @@ static bool _write_image_draw_command_buffers()
 		vkCmdDrawIndexed(_command_buffers.data[idx], _indices.count, 1, 0, 0, 0);
 		vkCmdEndRenderPass(_command_buffers.data[idx]);
 
-		VK_RETURN_FALSE(vkEndCommandBuffer(_command_buffers.data[idx]));
+		PROCESS_VK_RESULT(vkEndCommandBuffer(_command_buffers.data[idx]));
 	}
 
 	return true;
@@ -1567,7 +1628,7 @@ static bool _write_compute_command_buffer()
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 	};
 
-	VK_RETURN_FALSE(
+	PROCESS_VK_RESULT(
 		vkBeginCommandBuffer(
 			_command_buffers.data[_compute_command_buffer_idx],
 			&beginInfo
@@ -1813,8 +1874,6 @@ static void _mouse_button_callback(GLFWwindow *window, int mouse_button, int act
 		_particles.data[_particles.count] = new_particle;
 
 		_particles.count += 1;
-
-		CHECK_FALSE_M(_create_particle_buffer(), "Failed to create particle buffer.");
 	}
 }
 static bool _init_window()
@@ -1830,8 +1889,11 @@ static bool _init_window()
 	}
 
 	glfwSetWindowSizeCallback(_window, _window_resize_callback);
-	glfwSetMouseButtonCallback(_window, _mouse_button_callback);
+/*
+	callback is not properly implemented
 
+	glfwSetMouseButtonCallback(_window, _mouse_button_callback);
+*/
 	return true;
 }
 static bool _update_uniform_data_buffer()
@@ -1845,66 +1907,65 @@ static bool _update_uniform_data_buffer()
 	vkUnmapMemory(_device, _host_uniform_data_buffer_memory);
 
 	return _copy_buffer(&_device_uniform_data_buffer, &_host_uniform_data_buffer, buffer_size);
-
-	return true;
 }
+static void _glfw_error_callback(int glfw_errno, const char* error_description)
+{
+	printf("%s\n", error_description);
+}
+
 /* Module interface */
 
 bool setup_window_and_gpu()
 {
-	GLFW_RETURN_FALSE_M(glfwInit(), "Failed to initialize GLFW."); // to know which extensions GLFW requires
+	glfwSetErrorCallback(_glfw_error_callback);
+
+	if (GLFW_TRUE != glfwInit()) return false;
 
 	_setup_required_extensions();
 
-	RETURN_FALSE_M(_instance_supports_required_extensions(), "Some extensions are not supported.");
+	PROCESS_RESULT(_instance_supports_required_extensions());
 
 #ifdef _DEBUG
 	_required_validation_layers.names = (const char**)malloc(sizeof(const char*) * VALIDATION_LAYERS_COUNT);
 	_required_validation_layers.names[0] = "VK_LAYER_LUNARG_standard_validation";
 	_required_validation_layers.count = VALIDATION_LAYERS_COUNT;
 
-	RETURN_FALSE_M(_instance_supports_required_layers(), "Validation layers are not supported.")
+	PROCESS_RESULT(_instance_supports_required_layers());
 #endif
 
-	RETURN_FALSE_M(_create_instance(), "Failed to create instance.");
+	PROCESS_RESULT(_create_instance());
 
 #ifdef _DEBUG
-	RETURN_FALSE_M(_setup_debug_callback(), "Failed to set up debug callback.");
+	PROCESS_RESULT(_setup_debug_callback());
 #endif
 
-	RETURN_FALSE_M(_init_window(), "Failed to init window.");
-	VK_RETURN_FALSE_M(
-		glfwCreateWindowSurface(_instance, _window, NULL, &(_surface)),
-		"Failed to create surface."
-	);
+	PROCESS_RESULT(_init_window());
+	PROCESS_VK_RESULT(glfwCreateWindowSurface(_instance, _window, NULL, &(_surface)))
 
 	_required_physical_device_extensions.names = (const char**)malloc(sizeof(const char*) * PHYSICAL_DEVICE_EXTENSIONS_COUNT);
 	_required_physical_device_extensions.names[0] = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
 	_required_physical_device_extensions.count = PHYSICAL_DEVICE_EXTENSIONS_COUNT;
 
-	RETURN_FALSE_M(_pick_physical_device(), "Failed to find suitable GPU.");
-	RETURN_FALSE_M(_create_logical_device(), "Failed to create logical device.");
-	RETURN_FALSE_M(_create_swap_chain(), "Failed to create swap chain.");
-	RETURN_FALSE_M(
-		_create_command_pools_and_allocate_buffers(),
-		"Failed to create command pool or allocate buffers."
-	);
-	RETURN_FALSE_M(_create_depth_resources(), "Failed to create depth resources.");
-	RETURN_FALSE_M(_create_vertex_buffer(), "Failed to create vertex buffer.");
-	RETURN_FALSE_M(_create_index_buffer(), "Failed to create index buffer.");
-	RETURN_FALSE_M(_create_particle_buffer(), "Failed to create particle buffer.");
-	RETURN_FALSE_M(_create_uniform_data_buffer(), "Failed to create uniform data buffer.");
-	RETURN_FALSE_M(_create_descriptor_pool(), "Failed to create descriptor pool.");
-	RETURN_FALSE_M(_create_descriptor_set_layout(), "Failed to create descriptor set layout.");
-	RETURN_FALSE_M(_create_descriptor_sets(), "Failed to allocate descriptor sets.");
-	RETURN_FALSE_M(_create_render_pass(), "Failed to create render pass.");
-	RETURN_FALSE_M(_create_compute_pipeline(), "Failed to create compute pipeline.");
-	RETURN_FALSE_M(_create_compute_finished_fence(), "Failed to create compute finished fence.");
-	RETURN_FALSE_M(_create_graphics_pipeline(), "Failed to create graphics pipeline.");
-	RETURN_FALSE_M(_create_framebuffers(), "Failed to create swap chain framebuffers.");
-	RETURN_FALSE_M(_create_semaphores(), "Failed to create semaphores.");
-	RETURN_FALSE_M(_write_image_draw_command_buffers(), "Couldn't write draw commands.");
-	RETURN_FALSE_M(_write_compute_command_buffer(), "Couldn't write compute commands.");
+	PROCESS_RESULT(_pick_physical_device());
+	PROCESS_RESULT(_create_logical_device());
+	PROCESS_RESULT(_create_swap_chain());
+	PROCESS_RESULT(_create_command_pools_and_allocate_buffers());
+	PROCESS_RESULT(_create_depth_resources());
+	PROCESS_RESULT(_create_vertex_buffer());
+	PROCESS_RESULT(_create_index_buffer());
+	PROCESS_RESULT(_create_particle_buffer());
+	PROCESS_RESULT(_create_uniform_data_buffer());
+	PROCESS_RESULT(_create_descriptor_pool());
+	PROCESS_RESULT(_create_descriptor_set_layout());
+	PROCESS_RESULT(_create_descriptor_sets());
+	PROCESS_RESULT(_create_render_pass());
+	PROCESS_RESULT(_create_compute_pipeline());
+	PROCESS_RESULT(_create_compute_finished_fence());
+	PROCESS_RESULT(_create_graphics_pipeline());
+	PROCESS_RESULT(_create_framebuffers());
+	PROCESS_RESULT(_create_semaphores());
+	PROCESS_RESULT(_write_image_draw_command_buffers());
+	PROCESS_RESULT(_write_compute_command_buffer())
 
 	return true;
 }
@@ -2103,3 +2164,4 @@ void destroy_window_and_free_gpu()
 
 	vkDestroyInstance(_instance, NULL);
 }
+
